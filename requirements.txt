@@ -1,0 +1,124 @@
+# **Senior Engineer Coding Exercise**
+
+## **Overview**
+
+Build a full-stack web application for managing bullet loans and their repayment schedules.
+
+**Submission:** Push to a public GitHub repository and share the link.
+
+**If you’re utilizing LLMs - please share links to the chats or, if not possible, copy paste the chats to `chats.md`**
+
+---
+
+## **Tech Stack**
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | React, React Router, GraphQL (Apollo Client), Styled Components |
+| Backend | Node.js, GraphQL (Apollo Server), TypeORM |
+| Database | SQLite |
+
+---
+
+## **Application Requirements**
+
+### **Pages**
+
+### **`/loans` – Loan List**
+
+- Displays a list of all loans, each showing:
+    - Loan name
+    - Principal amount
+    - Start date
+    - Total expected interest (sum of all interest payments across the repayment schedule)
+- The list should support pagination
+- Each loan row is clickable and navigates to `/loan/:id`
+- A **"New Loan"** button opens a modal with the following fields:
+    - Loan name
+    - Principal amount
+    - Start date
+    - End date
+
+### **`/loan/:id` – Repayment Schedule**
+
+- Displays the full repayment schedule for the selected loan
+- Each row in the schedule should show:
+    - Payment date
+    - Payment type (`Interest` or `Principal + Interest`)
+    - Principal component
+    - Interest component
+    - Total payment amount
+    - Remaining balance after payment
+- Includes a **Back** button to return to `/loans`
+
+---
+
+## **Loan Logic**
+
+### **Loan Type: Bullet Loan**
+
+A bullet loan is a loan where the principal is repaid in full at the end of the loan. Until then, only interest is paid periodically.
+
+**Rules:**
+
+- The loan is **disbursed** on the `start date` for the full `principal amount`
+- **Monthly interest payments** are due on the last day of each calendar month between the start date and end date
+- On the **end date (maturity)**, the borrower pays the remaining principal **plus** any remaining interest for the final month
+- There is no amortization — the outstanding principal remains constant until maturity (The principal is paid in full on `end date`)
+
+### **Interest Rate**
+
+- Get the **Daily Prime Rate** by scraping this page (find a clean way to do it):
+    
+    ```
+    https://fred.stlouisfed.org/series/PRIME
+    ```
+    
+- Use the 30/360 interest method - meaning, if the rate hasn’t changed - every month accrue the same amount of interest regardless of the number of days it has.
+- Interest for a complete month with no rate changes is calculated as:
+    
+    ```
+    interest per month = principal × (annual_rate / 12)
+    ```
+    
+
+> **Note:** The prime rate may change multiple times during a month or change in the middle of the month. Account for this by applying each rate only to the days it was in effect within that period, rather than using a single rate for the entire period.
+> 
+
+---
+
+## **Data Model**
+
+You are free to design your schema, but it must support persisting loans and their repayment schedules. At minimum, consider:
+
+- `Loan`: id, name, principal amount, start date, end date, interest rate (at time of creation)
+- `RepaymentSchedule` (or `Payment`): id, loan id, payment date, principal, interest, total, remaining balance
+
+---
+
+## **GraphQL API**
+
+Design and implement a GraphQL API. At minimum it should support:
+
+- `loans` — query to list all loans with total expected interest
+- `loan(id)` — query to fetch a single loan with its repayment schedule
+- `createLoan(input)` — mutation to create a loan (fetches current rate, generates and persists the full repayment schedule)
+
+---
+
+## **Setup & Reproducibility**
+
+Your repository should include:
+
+- A `README.md` instructions to:
+    - Run the backend
+    - Run the frontend
+- Database migrations or auto-sync via TypeORM to set up the schema on first run
+
+---
+
+## **Notes**
+
+- Do not use any loan calculation libraries — implement the logic yourself
+- The interest rate should be fetched and **stored at the time of loan creation** (not re-fetched dynamically)
+- You may use any Apollo, TypeORM, or React libraries/helpers you're comfortable with

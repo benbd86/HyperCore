@@ -1,0 +1,29 @@
+{
+  "name": "hypercore-bullet-loans",
+  "version": "1.0.0",
+  "description": "Bullet loan management full-stack app",
+  "type": "module",
+  "scripts": {
+    "start": "node dist/server.js",
+    "dev": "tsx server.ts",
+    "build": "tsc",
+    "db:sync": "tsx -e \"import('./backend/db').then(m => m.initDb())\""
+  },
+  "dependencies": {
+    "@apollo/server": "^5.4.0",
+    "@as-integrations/express5": "^1.1.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "graphql": "^16.13.1",
+    "typeorm": "^0.3.20",
+    "better-sqlite3": "^11.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "tsx": "^4.19.2",
+    "@types/node": "^22.10.0",
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17"
+  }
+}
+
