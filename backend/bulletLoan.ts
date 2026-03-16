@@ -152,7 +152,7 @@ function interestAndPrimeRangeForMonth(
   observations: PrimeRateObservation[],
 ): { interest: number; primeRateRange: string } {
 
-  const daysInMonth = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0).getDate() - periodStart.getDate() + 1;
+  const daysInMonth = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0).getDate() - new Date(periodStart.getFullYear(), periodStart.getMonth(), 1).getDate() + 1;
   
   // No changes during that month - use fixed rate.
   if (observations.length === 0) {
