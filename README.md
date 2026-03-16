@@ -64,3 +64,8 @@ To reset the database, stop the backend, delete `data/loans.sqlite` (and the `da
 2. Last payment will occur on the end date of the loan (not on last day of the month like other payments).
 3. On loan creation - if any value of prime rate is failed to be fetched, fail the new loan creation.
 4. If a loan was taken on the last month's day, the interest for that month will be 0 (no full day of loan occurred).
+
+## Suggestions To Do:
+1. Add tests and arrange them.
+2. Add more restrictions and easy shortcuts to FE (e.g like open new loan with focus in name text box).
+3. Make more visually appealing.

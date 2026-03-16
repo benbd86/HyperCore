@@ -137,18 +137,20 @@ calls which, for use in explaining the project (e.g. in a job interview).
     |     |
     |     +-- Validates startDate <= endDate (throws if start > end)
     |     |
-    |     +-- If start date is in the future:
-    |     |     +-- getCurrentPrimeRateAsDecimal()  [primeRate.ts]
-    |     |     +-- generateBulletSchedule(principal, startDate, endDate, annualRate)
-    |     |           [bulletLoan.ts] — single rate, 30/360
+    |     +-- getCurrentPrimeRateAsDecimal()  [primeRate.ts]
+    |     |     +-- Scrapes the current prime from FRED (see flow 5)
+    |     |     +-- Stored on the Loan as annualRate at creation time
     |     |
-    |     +-- If start date is in the past:
-    |     |     +-- scrapePrimeRateForDates(startDate, scrapeEnd)  [primeScraper.ts]
-    |     |     |     +-- fetch(FRED_PRIME_DATA_URL) → HTML table#data-table-observations
-    |     |     |     +-- Returns initialRatePercent + observations in range
-    |     |     +-- getCurrentPrimeRateAsDecimal()  [for future periods]
-    |     |     +-- generateBulletScheduleWithPrimeHistory(...)  [bulletLoan.ts]
-    |     |           — prorates interest by prime rate changes within each period
+    |     +-- createLoanSchedule(principalAmount, startDate, endDate) [bulletLoan.ts]
+    |     |     +-- Internally:
+    |     |           1) Fetches relevant prime history for the loan period:
+    |     |                - Future loans → latest prime only
+    |     |                - Past/ongoing loans → rate in effect before first change
+    |     |                  + all changes in [startDate, endDate]
+    |     |           2) Builds a bullet schedule with:
+    |     |                - Interest-only payments on month ends
+    |     |                - Principal + final interest on endDate
+    |     |                - 30/360 behavior and per‑rate chunks when prime changes
     |     |
     |     +-- repo.create() + repo.save(loan)  [TypeORM → INSERT loan]
     |     +-- For each schedule row: paymentRepo.create() + paymentRepo.save(payment)
@@ -156,10 +158,9 @@ calls which, for use in explaining the project (e.g. in a job interview).
     |
     +-- Returns loan to client (Apollo may run Loan.* resolvers for formatting)
 
-  In short: Resolver → loanService.createLoan → validate dates → branch by
-  start vs today: future → current prime + generateBulletSchedule; past →
-  scrapePrimeRateForDates + generateBulletScheduleWithPrimeHistory → TypeORM
-  save Loan and Payment rows → return loan.
+  In short: Resolver → loanService.createLoan → validate dates → fetch current
+  prime for the Loan’s annualRate → createLoanSchedule computes the full bullet
+  schedule using prime history → TypeORM saves Loan and Payment rows → return loan.
 
 --------------------------------------------------------------------------------
 7. FRONTEND: APP BOOTSTRAP AND ROUTING
@@ -231,9 +232,15 @@ calls which, for use in explaining the project (e.g. in a job interview).
     |     +-- Response: { loan: { id, name, principalAmount, startDate, endDate,
     |                            annualRate, totalExpectedInterest, payments } }
     |
-    +-- Renders: "Back" button (navigate("/loans")), loan name, principal,
-          dates, rate, table of payments (date, type, principal, interest,
-          total, remaining balance)
+    +-- useQuery(PRIME_RATE)  [Apollo Client]
+    |     +-- Backend: resolvers.Query.primeRate → primeRate.getCurrentPrimeRateAsDecimal
+    |
+    +-- Renders:
+          - "Back" button (navigate("/loans"))
+          - Loan name, principal, start/end dates
+          - Loan rate at creation (annualRate) and current prime rate (from PRIME_RATE)
+          - Table of payments with columns:
+              date, type, prime rate range, principal, interest, total, remaining balance
 
   In short: LoanDetailPage loads a single loan with its payments via
   LOAN_DETAIL query and renders the repayment schedule table.
@@ -287,8 +294,9 @@ calls which, for use in explaining the project (e.g. in a job interview).
     +-- resolvers.Mutation.createLoan(input)
     |     +-- loanService.createLoan(input)
     |     |     +-- Validate startDate <= endDate (throw if not)
-    |     |     +-- Branch: future → current prime + generateBulletSchedule;
-    |     |             past → scrapePrimeRateForDates + generateBulletScheduleWithPrimeHistory
+    |     |     +-- getCurrentPrimeRateAsDecimal() for Loan.annualRate at creation
+    |     |     +-- createLoanSchedule(principalAmount, startDate, endDate)
+    |     |           → builds bullet schedule using prime history
     |     |     +-- TypeORM: save Loan, then save each Payment row to SQLite
     |     +-- return loan
     +-- Apollo serializes response → JSON
@@ -311,11 +319,11 @@ calls which, for use in explaining the project (e.g. in a job interview).
   Flow                    | Frontend entry           | API              | Backend entry      | Key backend calls
   ------------------------|--------------------------|------------------|--------------------|------------------------------------------
   Load loans list         | LoansPage useQuery       | loans            | Query.loans        | loanService.getLoansPaginated → TypeORM
-  Load prime rate         | LoansPage useQuery       | primeRate        | Query.primeRate    | primeRate.getCurrentPrimeRateAsDecimal → primeScraper.scrapeCurrentPrimeRate
+  Load prime rate         | LoansPage/LoanDetail useQuery | primeRate   | Query.primeRate    | primeRate.getCurrentPrimeRateAsDecimal → primeScraper.scrapeCurrentPrimeRate
   Load one loan/schedule  | LoanDetailPage useQuery  | loan(id)         | Query.loan         | loanService.getLoanById → TypeORM
-  Create loan             | NewLoanModal useMutation| createLoan       | Mutation.createLoan| loanService.createLoan (validate start<=end) →
-                          | (validates start<=end)   |                  |                    | primeRate or scrapePrimeRateForDates →
-                          |                          |                  |                    | generateBulletSchedule or generateBulletScheduleWithPrimeHistory → TypeORM save
+  Create loan             | NewLoanModal useMutation | createLoan       | Mutation.createLoan| loanService.createLoan (validate start<=end) →
+                          | (validates start<=end)   |                  |                    | getCurrentPrimeRateAsDecimal →
+                          |                          |                  |                    | createLoanSchedule → TypeORM save
 
 ================================================================================
 END OF FLOWS EXPLANATION

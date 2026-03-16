@@ -94,11 +94,12 @@ backend/resolvers.ts
 backend/loanService.ts
   Purpose: Business logic for loan creation and retrieval.
   What it does: createLoan() validates startDate <= endDate (throws otherwise),
-  then branches: if start is in the future, uses getCurrentPrimeRateAsDecimal()
-  and generateBulletSchedule(); if start is in the past, fetches prime history
-  via scrapePrimeRateForDates() and uses generateBulletScheduleWithPrimeHistory()
-  so each payment period uses the correct historical prime rates. Saves the Loan
-  and all Payment rows and returns the loan.
+  then calls getCurrentPrimeRateAsDecimal() once to store the Loan’s annualRate
+  at creation, and calls createLoanSchedule(principalAmount, startDate, endDate)
+  from bulletLoan.ts. createLoanSchedule internally fetches the relevant prime
+  history (future loans: latest prime only; past/ongoing: rate in effect before
+  the first change plus all changes in range) and builds the full bullet schedule.
+  loanService then saves the Loan and all Payment rows and returns the loan.
   getLoansPaginated() and getLoanById() read from the database with
   relations. totalExpectedInterest() sums the interest components of a loan’s
   payments.
@@ -112,14 +113,17 @@ backend/primeRate.ts
 
 backend/bulletLoan.ts
   Purpose: Bullet loan repayment schedule calculation (no external libraries).
-  What it does: Two entry points: generateBulletSchedule() for a single fixed
-  rate (future loans); generateBulletScheduleWithPrimeHistory() for past loans
-  using scraped prime observations and an initial rate. Implements 30/360:
-  interest-only payments on the last day of each calendar month; principal plus
-  final interest on the end date. When prime changes during a period, interest
-  is prorated by days at each rate. Returns ScheduleRow[] (paymentDate,
-  paymentType, principalComponent, interestComponent, totalAmount,
-  remainingBalance, primeRateRange).
+  What it does: Exposes createLoanSchedule(principal, startDate, endDate) as the
+  single entry point. Internally fetches the relevant prime history for the loan
+  dates (future loans: latest prime only; past/ongoing: rate in effect before
+  the first change plus all changes in range) using primeRate.ts and scrapers.
+  Then createPaymentsSchedule builds a bullet schedule:
+    - Interest-only payments on month ends
+    - Principal plus final interest on the end date
+    - 30/360 behavior for full months; when prime changes mid-period, interest is
+      split into chunks by days at each rate.
+  Returns ScheduleRow[] with paymentDate, paymentType, principalComponent,
+  interestComponent, totalAmount, remainingBalance, and primeRateRange.
 
 backend/entities/Loan.ts
   Purpose: TypeORM entity for the loans table.
@@ -177,12 +181,13 @@ backend/tests/primeScraper.test.ts
   initial 7.5 and observations for 2025-09-17, 2025-10-30, 2025-12-11.
 
 backend/tests/bulletLoan.test.ts
-  Purpose: Unit tests for generateBulletSchedule and prime-history schedule.
+  Purpose: Unit tests for createLoanSchedule and the bullet schedule logic.
   What it does: Uses Vitest to test schedule generation with different
-  start/end dates, same month vs different months, and loan periods.
-  Asserts row count, payment types, principal conservation, zero remaining
-  balance, ascending payment dates, and 30/360 full-month interest.
-  Includes tests for prime-history rate segmentation and segment day count.
+  start/end dates, same month vs different months, and various loan periods.
+  Mocks the primeRate module so tests run against a fixed rate. Asserts row
+  count, payment types, principal conservation, zero remaining balance,
+  ascending payment dates, primeRateRange values, and 30/360 full-month
+  interest behavior.
 
 backend/tests/createLoan.integration.test.ts
   Purpose: Full backend integration test for createLoan.
@@ -272,9 +277,11 @@ frontend/src/pages/LoansPage.tsx
 frontend/src/pages/LoanDetailPage.tsx
   Purpose: Single loan repayment schedule page at /loan/:id.
   What it does: Reads :id from the URL, runs useQuery(LOAN_DETAIL) for
-  that loan, and renders a “Back” button to /loans, loan summary (name,
-  principal, dates, rate), and a table of payments (date, type, principal,
-  interest, total, remaining balance). Handles loading and error states.
+  that loan, and runs useQuery(PRIME_RATE) to get the current prime. Renders a
+  “Back” button to /loans, loan summary (name, principal, dates, loan rate at
+  creation, current prime rate), and a table of payments with columns: date,
+  type, prime rate range, principal, interest, total, remaining balance.
+  Handles loading and error states.
 
 frontend/src/components/Layout.tsx
   Purpose: Page layout wrapper.

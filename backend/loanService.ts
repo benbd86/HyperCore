@@ -2,6 +2,7 @@ import { AppDataSource } from "./db.js";
 import { Loan } from "./entities/Loan.js";
 import { Payment } from "./entities/Payment.js";
 import { createLoanSchedule } from "./bulletLoan.js";
+import { getCurrentPrimeRateAsDecimal } from "./primeRate.js";
 
 export interface CreateLoanInput {
   name: string;
@@ -20,7 +21,9 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
     throw new Error(ERROR_START_AFTER_END);
   }
 
-  const { schedule, annualRate } = await createLoanSchedule(
+  const annualRate = await getCurrentPrimeRateAsDecimal();
+
+  const schedule = await createLoanSchedule(
     input.principalAmount,
     input.startDate,
     input.endDate

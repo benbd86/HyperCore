@@ -72,16 +72,21 @@ export async function scrapePrimeRateForDates(
   }
 
   const firstInRangeIdx = observations.findIndex((o) => o.date >= start);
+
+  // no changes after loan start date, use the latest rate
   if (firstInRangeIdx === -1) {
     return {
       observations: [],
       initialRatePercent: observations[observations.length - 1].value,
     };
   }
+
+  // no changes before loan start date, throw error (no data for initial rate).
   if (firstInRangeIdx === 0) {
     throw new Error(ERROR_NO_DATA_BEFORE_START);
   }
 
+  // get the initial rate and the observations in range.
   const initialRatePercent = observations[firstInRangeIdx - 1].value;
   const inRange = observations.filter((o) => o.date >= start && o.date <= end);
 
