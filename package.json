@@ -7,9 +7,12 @@
     "start": "node dist/server.js",
     "dev": "tsx server.ts",
     "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:sync": "tsx -e \"import('./backend/db').then(m => m.initDb())\""
   },
   "dependencies": {
+    "cheerio": "^1.0.0",
     "@apollo/server": "^5.4.0",
     "@as-integrations/express5": "^1.1.0",
     "cors": "^2.8.5",
@@ -21,6 +24,7 @@
   "devDependencies": {
     "typescript": "^5.7.2",
     "tsx": "^4.19.2",
+    "vitest": "^2.1.0",
     "@types/node": "^22.10.0",
     "@types/express": "^5.0.0",
     "@types/cors": "^2.8.17"

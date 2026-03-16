@@ -1,0 +1,28 @@
+Bullet loan logic should be as follows:
+
+1. Get all relevant PrimeRate values:
+    a. Future loan -> list with only the latest prime value.
+    b. On going loan -> list with the latest prime value before the first change in the loan dates range + all changes inside the date range.
+    c. Past loan -> list with the latest prime value before the first change in the loan dates range + all changes inside the date range.
+
+2. Create payments:
+    For every month in loan range:
+        a. calculate amount of effective days for that month (e.g first/last payment might not be of a full month).
+        b. get all prime changes for that payment's month:
+            i. if no changes were made that month (empty change list) - calculate interest payment as [effective days in month(if full month always count as 30) * (effective prime rate / 12)] * loan amount.
+            ii. if there were changes for prime that month:
+                calculate all chunks (amount of days with each prime rate). Calculate as [(correlating prime rate * (affected days / effective days in the month / 12)) * loan amount] and sum all chunks.
+        
+
+The file should contain only the following exported function:
+    createLoanSchedule:
+        1. Call another function to collect all relevant prime changes for the loan period (like explained in 'Get all relevant PrimeRate values') - named 'getInitialRateAndChangesInPeriod'.
+        2. Pass the list of primes to 'createPaymentsSchedule' - that function will return the list of scheduled payments by performing the following logic:
+            a. save first prime rate in list as initial prime rate.
+            b. for each month in payment period:
+                i. pop from the list all the relevant prime changes for the payment's month.
+                ii. calculate amount of days applied for each prime rate. Sum according to '2.b.ii' if has relevant changes, if not calculate according to '2.b.i'.
+                iii. keep latest prime rate for next months payment as initial prime rate.
+            c. For non full months (possible for first payment or last payment) - calculate the amount of relevant loan days and calculate interest as [(effective days / days in that month) * (rate / 12)] note that this calculation is the same as for 2.b.ii but for a non full month (re-use the code).
+
+For all manipulation made on dates in order to convert - use dateUtils.

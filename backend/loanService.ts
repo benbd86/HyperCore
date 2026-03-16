@@ -1,8 +1,7 @@
 import { AppDataSource } from "./db.js";
 import { Loan } from "./entities/Loan.js";
 import { Payment } from "./entities/Payment.js";
-import { getCurrentPrimeRateAsDecimal } from "./primeRate.js";
-import { generateBulletSchedule } from "./bulletLoan.js";
+import { createLoanSchedule } from "./bulletLoan.js";
 
 export interface CreateLoanInput {
   name: string;
@@ -11,17 +10,24 @@ export interface CreateLoanInput {
   endDate: string;
 }
 
-export async function createLoan(input: CreateLoanInput): Promise<Loan> {
-  const repo = AppDataSource.getRepository(Loan);
-  const paymentRepo = AppDataSource.getRepository(Payment);
+const ERROR_START_AFTER_END = "Start date must be before or equal to end date.";
 
-  const annualRate = await getCurrentPrimeRateAsDecimal();
-  const schedule = generateBulletSchedule(
+/**
+ * Creates a new loan with the given input, validates start/end dates, computes the schedule via bulletLoan, and persists the loan and its payments.
+ */
+export async function createLoan(input: CreateLoanInput): Promise<Loan> {
+  if (input.startDate > input.endDate) {
+    throw new Error(ERROR_START_AFTER_END);
+  }
+
+  const { schedule, annualRate } = await createLoanSchedule(
     input.principalAmount,
     input.startDate,
-    input.endDate,
-    annualRate
+    input.endDate
   );
+
+  const repo = AppDataSource.getRepository(Loan);
+  const paymentRepo = AppDataSource.getRepository(Payment);
 
   const loan = repo.create({
     name: input.name,
@@ -41,6 +47,7 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
       interestComponent: String(row.interestComponent),
       totalAmount: String(row.totalAmount),
       remainingBalance: String(row.remainingBalance),
+      primeRateRange: row.primeRateRange,
     });
     await paymentRepo.save(payment);
   }
@@ -48,6 +55,9 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
   return loan;
 }
 
+/**
+ * Returns a page of loans (newest first) with total count; each loan includes its payments.
+ */
 export async function getLoansPaginated(
   offset: number,
   limit: number
@@ -62,6 +72,9 @@ export async function getLoansPaginated(
   return { loans, total };
 }
 
+/**
+ * Fetches a single loan by id with its payments ordered by payment date, or null if not found.
+ */
 export async function getLoanById(id: string): Promise<Loan | null> {
   const repo = AppDataSource.getRepository(Loan);
   return repo.findOne({

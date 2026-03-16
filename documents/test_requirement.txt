@@ -1,0 +1,23 @@
+This file describes all tests that should be executed in order to declare this project successful:
+==================================================================================================
+
+Scraper Tests:
+==============
+Will test the class primeScraper for the following test cases:
+1. Get current prime by calling scrapeCurrentPrimeRate
+    a. Successful scraping
+    b. Failed scraping - catch the expected exception
+2. Get prime changes in date range (using html_prime_full_changes_example.html as an example):
+    a. Test for range 1/1/2025 to 1/1/2026 - verify the changes returned are (2025-09-17 & 7.25%, 2025-10-30 & 7.00%, 2025-12-11 & 6.75%), the initial rate should be 7.50% (from 2024-12-20)
+    b. Test for range 1/1/2025 to 1/1/2027 - same values should be returned like in case 'a'.
+    c. Get range of dates starting before the first available prime change (before 1955-08-04) - this should fail on no initial prime value.
+
+
+
+Integration Tests:
+==================
+Test suit to test the backend for loans creation, should test for all the possible cases for a loan:
+1. Started and ended in the past. Expected result - interest is changing according to prime changes in that period.
+2. Started in the past and will end in the future - interest is changing according to prime change in that period, for the future payment use the latest prime for all.
+3. Will start in the future and end in the future - interest will be the current prime rate for all future payments.
+4. more cases should hande different start and end dates days of the month (first day of the month, last day of the month, random day which is not the first or last day of the month).

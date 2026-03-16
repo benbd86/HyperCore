@@ -14,26 +14,34 @@ import {
   ErrorMessage,
 } from "./NewLoanModal.styles";
 
+const DATE_VALIDATION_MESSAGE = "Start date must be before or equal to end date.";
+
 interface NewLoanModalProps {
   onClose: () => void;
   onCreated: () => void;
 }
 
+/** Modal form to create a new loan (name, principal, start/end dates); calls onCreated on success and onClose to dismiss. */
 export function NewLoanModal({ onClose, onCreated }: NewLoanModalProps) {
   const [name, setName] = useState("");
   const [principalAmount, setPrincipalAmount] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [dateError, setDateError] = useState<string | null>(null);
   const [createLoan, { loading, error }] = useMutation(CREATE_LOAN, {
     onCompleted: onCreated,
     onError: () => {},
   });
 
+  const isInvalidDates = startDate && endDate && startDate > endDate;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setDateError(null);
     const principal = parseFloat(principalAmount);
     if (!name.trim() || Number.isNaN(principal) || !startDate || !endDate) return;
-    if (new Date(endDate) <= new Date(startDate)) {
+    if (startDate > endDate) {
+      setDateError(DATE_VALIDATION_MESSAGE);
       return;
     }
     createLoan({
@@ -82,7 +90,10 @@ export function NewLoanModal({ onClose, onCreated }: NewLoanModalProps) {
               id="start-date"
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setDateError(null);
+              }}
               required
             />
           </FormGroup>
@@ -92,10 +103,16 @@ export function NewLoanModal({ onClose, onCreated }: NewLoanModalProps) {
               id="end-date"
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setDateError(null);
+              }}
               required
             />
           </FormGroup>
+          {dateError && (
+            <ErrorMessage>{dateError}</ErrorMessage>
+          )}
           {error && (
             <ErrorMessage>
               {error.message}
@@ -105,7 +122,7 @@ export function NewLoanModal({ onClose, onCreated }: NewLoanModalProps) {
             <CancelButton type="button" onClick={onClose}>
               Cancel
             </CancelButton>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || !!isInvalidDates}>
               {loading ? "Creating…" : "Create loan"}
             </Button>
           </ModalActions>

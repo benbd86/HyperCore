@@ -1,5 +1,6 @@
 import { gql } from "@apollo/client";
 
+/** GraphQL documents: LOANS_PAGE, LOAN_DETAIL, PRIME_RATE (queries), CREATE_LOAN (mutation). */
 export const LOANS_PAGE = gql`
   query LoansPage($offset: Int, $limit: Int) {
     loans(offset: $offset, limit: $limit) {
@@ -35,8 +36,15 @@ export const LOAN_DETAIL = gql`
         interestComponent
         totalAmount
         remainingBalance
+        primeRateRange
       }
     }
+  }
+`;
+
+export const PRIME_RATE = gql`
+  query PrimeRate {
+    primeRate
   }
 `;
 

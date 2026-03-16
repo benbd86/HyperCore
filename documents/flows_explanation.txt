@@ -1,0 +1,322 @@
+================================================================================
+HYPERCORE BULLET LOAN MANAGER - FLOWS EXPLANATION
+================================================================================
+This document describes the main flows in the system and which component
+calls which, for use in explaining the project (e.g. in a job interview).
+================================================================================
+
+--------------------------------------------------------------------------------
+1. BACKEND: SERVER STARTUP
+--------------------------------------------------------------------------------
+
+  server.ts (main)
+    |
+    +-- initDb()  [backend/db.ts]
+    |     |
+    |     +-- Ensures data/ directory exists (fs.mkdirSync)
+    |     +-- AppDataSource.initialize()  [TypeORM]
+    |     |     +-- Connects to SQLite at data/loans.sqlite
+    |     |     +-- synchronize: true → creates/updates loans & payments tables
+    |     +-- Returns DataSource
+    |
+    +-- express() → http.createServer(app)
+    +-- new ApolloServer({ typeDefs, resolvers, plugins })
+    |     typeDefs from backend/schema.ts
+    |     resolvers from backend/resolvers.ts
+    +-- server.start()
+    +-- app.use("/graphql", cors(), express.json(), expressMiddleware(server))
+    +-- httpServer.listen(PORT)
+
+  In short: Entry point initializes the database, then mounts Express and
+  Apollo Server on /graphql. Every GraphQL request goes through Express
+  → Apollo → resolvers.
+
+--------------------------------------------------------------------------------
+2. BACKEND: GRAPHQL REQUEST HANDLING (ANY OPERATION)
+--------------------------------------------------------------------------------
+
+  HTTP POST /graphql (body: { query, variables })
+    |
+    +-- Express (server.ts)
+    |     +-- cors(), express.json(), expressMiddleware(server)
+    +-- Apollo Server
+    |     +-- Parses query/mutation, validates against schema (schema.ts)
+    |     +-- Dispatches to the right resolver in resolvers.ts
+    +-- resolvers.ts
+          +-- Query: loans | loan | primeRate
+          +-- Mutation: createLoan
+          +-- Type resolvers: Loan.*, Payment.* (for field-level resolution)
+
+  So: Client sends a GraphQL document → Apollo matches it to a resolver →
+  resolver calls service/DB and returns data → Apollo serializes response → client.
+
+--------------------------------------------------------------------------------
+3. BACKEND: FLOW FOR "LIST LOANS" (QUERY: loans)
+--------------------------------------------------------------------------------
+
+  resolvers.ts  [Query.loans]
+    |
+    +-- getLoansPaginated(offset, limit)  [backend/loanService.ts]
+    |     |
+    |     +-- AppDataSource.getRepository(Loan)
+    |     +-- repo.findAndCount({ order, skip, take, relations: ["payments"] })
+    |     |     [TypeORM → SQLite: SELECT from loans + payments]
+    |     +-- Returns { loans, total }
+    |
+    +-- Returns { items: loans, totalCount: total, hasMore }
+
+  When the client also asks for totalExpectedInterest on each loan:
+    resolvers.ts  [Loan.totalExpectedInterest]
+      +-- totalExpectedInterest(parent)  [backend/loanService.ts]
+      |     +-- Sums parent.payments[].interestComponent (already loaded)
+      +-- Returns number
+
+  In short: Resolver calls loanService.getLoansPaginated → TypeORM reads
+  loans (with payments) from SQLite → resolver shapes response; total
+  expected interest is computed per loan from its payments in the resolver.
+
+--------------------------------------------------------------------------------
+4. BACKEND: FLOW FOR "SINGLE LOAN + SCHEDULE" (QUERY: loan(id))
+--------------------------------------------------------------------------------
+
+  resolvers.ts  [Query.loan]
+    |
+    +-- getLoanById(id)  [backend/loanService.ts]
+    |     |
+    |     +-- AppDataSource.getRepository(Loan)
+    |     +-- repo.findOne({ where: { id }, relations: ["payments"], order })
+    |     |     [TypeORM → SQLite: SELECT loan + payments by loanId]
+    |     +-- Returns Loan | null
+    |
+    +-- Returns loan (Apollo then runs Loan.* and Payment.* resolvers for
+        decimal/float conversion and payment sort)
+
+  resolvers.ts  [Loan.principalAmount, Loan.annualRate]
+    +-- parseFloat(parent.principalAmount), parseFloat(parent.annualRate)
+
+  resolvers.ts  [Loan.totalExpectedInterest]
+    +-- totalExpectedInterest(parent)  [loanService.ts] (sum of payment interest)
+
+  resolvers.ts  [Loan.payments]
+    +-- Sorts parent.payments by paymentDate, returns array
+
+  resolvers.ts  [Payment.*]
+    +-- parseFloat on each decimal field for GraphQL Float output
+
+  In short: Resolver calls loanService.getLoanById → TypeORM loads one loan
+  with payments → resolver returns it; type resolvers then format decimals
+  and sort payments.
+
+--------------------------------------------------------------------------------
+5. BACKEND: FLOW FOR "CURRENT PRIME RATE" (QUERY: primeRate)
+--------------------------------------------------------------------------------
+
+  resolvers.ts  [Query.primeRate]
+    |
+    +-- getCurrentPrimeRateAsDecimal()  [backend/primeRate.ts]
+    |     +-- scrapeCurrentPrimeRate()  [backend/scrapers/primeScraper.ts]
+    |     |     +-- fetch(FRED_PRIME_URL) → HTML
+    |     |     +-- cheerio.load(html) → $(`.series-meta-observation-value`).first().text()
+    |     |     +-- parseFloat(rawValue); throws if not finite or on fetch error
+    |     |     +-- Returns rate in percent (e.g. 6.75)
+    |     +-- Returns rate / 100 (e.g. 0.0675)
+    |
+    +-- Returns Float to client (decimal, e.g. 0.0675)
+
+  In short: Resolver → primeRate.getCurrentPrimeRateAsDecimal →
+  scrapeCurrentPrimeRate (fetch FRED series page, parse with Cheerio) →
+  divide by 100 → return decimal to client.
+
+--------------------------------------------------------------------------------
+6. BACKEND: FLOW FOR "CREATE LOAN" (MUTATION: createLoan)
+--------------------------------------------------------------------------------
+
+  resolvers.ts  [Mutation.createLoan]
+    |
+    +-- createLoanService(input)  [backend/loanService.ts]
+    |     |
+    |     +-- Validates startDate <= endDate (throws if start > end)
+    |     |
+    |     +-- If start date is in the future:
+    |     |     +-- getCurrentPrimeRateAsDecimal()  [primeRate.ts]
+    |     |     +-- generateBulletSchedule(principal, startDate, endDate, annualRate)
+    |     |           [bulletLoan.ts] — single rate, 30/360
+    |     |
+    |     +-- If start date is in the past:
+    |     |     +-- scrapePrimeRateForDates(startDate, scrapeEnd)  [primeScraper.ts]
+    |     |     |     +-- fetch(FRED_PRIME_DATA_URL) → HTML table#data-table-observations
+    |     |     |     +-- Returns initialRatePercent + observations in range
+    |     |     +-- getCurrentPrimeRateAsDecimal()  [for future periods]
+    |     |     +-- generateBulletScheduleWithPrimeHistory(...)  [bulletLoan.ts]
+    |     |           — prorates interest by prime rate changes within each period
+    |     |
+    |     +-- repo.create() + repo.save(loan)  [TypeORM → INSERT loan]
+    |     +-- For each schedule row: paymentRepo.create() + paymentRepo.save(payment)
+    |     +-- Returns saved loan (with id)
+    |
+    +-- Returns loan to client (Apollo may run Loan.* resolvers for formatting)
+
+  In short: Resolver → loanService.createLoan → validate dates → branch by
+  start vs today: future → current prime + generateBulletSchedule; past →
+  scrapePrimeRateForDates + generateBulletScheduleWithPrimeHistory → TypeORM
+  save Loan and Payment rows → return loan.
+
+--------------------------------------------------------------------------------
+7. FRONTEND: APP BOOTSTRAP AND ROUTING
+--------------------------------------------------------------------------------
+
+  index.html
+    +-- Loads /src/main.tsx (Vite entry)
+
+  main.tsx
+    +-- ReactDOM.createRoot(#root).render(
+          <ApolloProvider client={client}>     ← apolloClient.ts
+            <BrowserRouter>
+              <GlobalStyles />                 ← globalStyles.ts
+              <App />                          ← App.tsx
+            </BrowserRouter>
+          </ApolloProvider>
+        )
+
+  App.tsx
+    +-- <Layout>                               ← components/Layout.tsx
+    |     <Routes>
+    |       /       → <Navigate to="/loans" />
+    |       /loans  → <LoansPage />            ← pages/LoansPage.tsx
+    |       /loan/:id → <LoanDetailPage />     ← pages/LoanDetailPage.tsx
+    |     </Routes>
+    |   </Layout>
+
+  In short: main.tsx mounts Apollo + Router + global styles and App; App
+  defines routes and wraps them in Layout. / redirects to /loans.
+
+--------------------------------------------------------------------------------
+8. FRONTEND: FLOW FOR "LOANS LIST PAGE" (/loans)
+--------------------------------------------------------------------------------
+
+  User navigates to /loans (or /)
+    |
+    +-- LoansPage mounts
+    |
+    +-- useQuery(LOANS_PAGE, { variables: { offset, limit } })  [Apollo Client]
+    |     +-- Sends GraphQL query to /graphql (proxied to backend in dev)
+    |     +-- Backend: resolvers.Query.loans → loanService.getLoansPaginated
+    |     +-- Response: { loans: { items, totalCount, hasMore } }
+    |
+    +-- (Optional) useQuery(PRIME_RATE)  [if enabled]
+    |     +-- Backend: resolvers.Query.primeRate → primeRate.getCurrentPrimeRateAsDecimal
+    |
+    +-- Renders: title, "New Loan" button, prime rate label (if used),
+          table of loans (name, principal, start date, total expected interest),
+          pagination (Previous/Next). Each row click → navigate(`/loan/${loan.id}`)
+
+  "New Loan" click
+    +-- setModalOpen(true) → NewLoanModal renders (see flow 10)
+
+  In short: LoansPage runs one or two queries on load (loans + optional
+  prime rate), displays table and pagination, and opens the create-loan
+  modal when the user clicks "New Loan".
+
+--------------------------------------------------------------------------------
+9. FRONTEND: FLOW FOR "LOAN DETAIL / SCHEDULE PAGE" (/loan/:id)
+--------------------------------------------------------------------------------
+
+  User clicks a loan row on /loans (or navigates to /loan/:id)
+    |
+    +-- LoanDetailPage mounts
+    +-- useParams() → id
+    +-- useQuery(LOAN_DETAIL, { variables: { id }, skip: !id })
+    |     +-- Sends GraphQL query with loan id to /graphql
+    |     +-- Backend: resolvers.Query.loan → loanService.getLoanById(id)
+    |     +-- Response: { loan: { id, name, principalAmount, startDate, endDate,
+    |                            annualRate, totalExpectedInterest, payments } }
+    |
+    +-- Renders: "Back" button (navigate("/loans")), loan name, principal,
+          dates, rate, table of payments (date, type, principal, interest,
+          total, remaining balance)
+
+  In short: LoanDetailPage loads a single loan with its payments via
+  LOAN_DETAIL query and renders the repayment schedule table.
+
+--------------------------------------------------------------------------------
+10. FRONTEND: FLOW FOR "CREATE NEW LOAN" (MODAL)
+--------------------------------------------------------------------------------
+
+  User on /loans clicks "New Loan"
+    |
+    +-- LoansPage sets modalOpen true → NewLoanModal renders (overlay + form)
+
+  User fills form (name, principal, start date, end date) and submits
+    |
+    +-- NewLoanModal handleSubmit(e)
+    |     +-- e.preventDefault()
+    |     +-- Validates: name, principal number, start/end dates present; start <= end
+    |     +-- If start > end: set dateError message, disable submit, return (no mutation)
+    |     +-- useMutation(CREATE_LOAN, { onCompleted: onCreated })
+    |           createLoan({ variables: { input: { name, principalAmount, startDate, endDate } } })
+    |
+    +-- Apollo Client sends mutation to /graphql
+    |
+    +-- Backend: resolvers.Mutation.createLoan → loanService.createLoan(input)
+    |     (see backend flow 6: prime rate → schedule → save loan + payments)
+    |
+    +-- Response: created loan
+    +-- onCompleted() runs → onCreated() [passed from LoansPage]
+    |     +-- setModalOpen(false)  (close modal)
+    |     +-- refetch()  (LoansPage’s useQuery(LOANS_PAGE) refetch)
+    |
+    +-- Loans list updates with the new loan; modal closes
+
+  In short: NewLoanModal submits the form via CREATE_LOAN mutation →
+  backend creates loan and schedule and saves to DB → on success, modal
+  closes and the loans list refetches so the new loan appears.
+
+--------------------------------------------------------------------------------
+11. CROSS-BOUNDARY: END-TO-END "CREATE LOAN" (FRONTEND → BACKEND → DB)
+--------------------------------------------------------------------------------
+
+  Browser (user submits "New Loan" form; client already validated start <= end)
+    |
+    +-- NewLoanModal: createLoan({ variables: { input } })
+    +-- Apollo Client (apolloClient.ts): HttpLink POST /graphql
+    |
+    +-- In dev: Vite proxy forwards /graphql → http://localhost:4000/graphql
+    |
+    +-- Backend Express receives POST /graphql
+    +-- Apollo Server parses body, runs mutation createLoan
+    +-- resolvers.Mutation.createLoan(input)
+    |     +-- loanService.createLoan(input)
+    |     |     +-- Validate startDate <= endDate (throw if not)
+    |     |     +-- Branch: future → current prime + generateBulletSchedule;
+    |     |             past → scrapePrimeRateForDates + generateBulletScheduleWithPrimeHistory
+    |     |     +-- TypeORM: save Loan, then save each Payment row to SQLite
+    |     +-- return loan
+    +-- Apollo serializes response → JSON
+    |
+    +-- Frontend receives response
+    +-- onCompleted → close modal, refetch loans query
+    +-- useQuery(LOANS_PAGE) refetches → same chain: resolvers.Query.loans
+          → loanService.getLoansPaginated → SQLite → response
+    +-- LoansPage re-renders with new loan in the table
+
+  In short: Frontend mutation → HTTP → Express → Apollo → createLoan
+  resolver → loanService (rate + schedule + DB writes) → response →
+  frontend closes modal and refetches list; list query hits loans
+  resolver → loanService.getLoansPaginated → SQLite read.
+
+--------------------------------------------------------------------------------
+12. SUMMARY TABLE FOR QUICK REFERENCE
+--------------------------------------------------------------------------------
+
+  Flow                    | Frontend entry           | API              | Backend entry      | Key backend calls
+  ------------------------|--------------------------|------------------|--------------------|------------------------------------------
+  Load loans list         | LoansPage useQuery       | loans            | Query.loans        | loanService.getLoansPaginated → TypeORM
+  Load prime rate         | LoansPage useQuery       | primeRate        | Query.primeRate    | primeRate.getCurrentPrimeRateAsDecimal → primeScraper.scrapeCurrentPrimeRate
+  Load one loan/schedule  | LoanDetailPage useQuery  | loan(id)         | Query.loan         | loanService.getLoanById → TypeORM
+  Create loan             | NewLoanModal useMutation| createLoan       | Mutation.createLoan| loanService.createLoan (validate start<=end) →
+                          | (validates start<=end)   |                  |                    | primeRate or scrapePrimeRateForDates →
+                          |                          |                  |                    | generateBulletSchedule or generateBulletScheduleWithPrimeHistory → TypeORM save
+
+================================================================================
+END OF FLOWS EXPLANATION
+================================================================================

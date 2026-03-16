@@ -1,4 +1,6 @@
-// Schema as template literal (Apollo Server 5)
+/**
+ * GraphQL schema: Loan, Payment, LoansPage, CreateLoanInput; Query (loans, loan, primeRate); Mutation (createLoan).
+ */
 const typeDefs = `#graphql
   type Loan {
     id: ID!
@@ -20,6 +22,7 @@ const typeDefs = `#graphql
     interestComponent: Float!
     totalAmount: Float!
     remainingBalance: Float!
+    primeRateRange: String
   }
 
   type LoansPage {
@@ -31,6 +34,7 @@ const typeDefs = `#graphql
   type Query {
     loans(offset: Int = 0, limit: Int = 10): LoansPage!
     loan(id: ID!): Loan
+    primeRate: Float!
   }
 
   input CreateLoanInput {

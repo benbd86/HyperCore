@@ -1,0 +1,312 @@
+================================================================================
+HYPERCORE BULLET LOAN MANAGER - FILE EXPLANATIONS
+================================================================================
+Only non-generated source and configuration files are listed.
+Excluded: node_modules/, dist/, backend/dist/, frontend/dist/, package-lock.json,
+and compiled/generated artifacts.
+================================================================================
+
+--------------------------------------------------------------------------------
+PROJECT ROOT
+--------------------------------------------------------------------------------
+
+package.json
+  Purpose: Node.js project manifest and dependency management.
+  What it does: Defines project name, version, npm scripts (start, dev, build,
+  test, db:sync), and lists dependencies (Apollo Server, Express, TypeORM,
+  better-sqlite3, cheerio, etc.) and devDependencies (TypeScript, tsx, vitest,
+  type definitions). Scripts wire the backend entry point (dist/server.js for
+  start, tsx server.ts for dev), the TypeScript build, and Vitest for tests.
+
+tsconfig.json
+  Purpose: TypeScript compiler configuration for the backend.
+  What it does: Sets target ES2022, NodeNext modules, strict mode, and
+  emitDecoratorMetadata for TypeORM. Compiles server.ts and backend/**/*.ts
+  into the dist/ folder. Excludes node_modules, frontend, and backend/tests
+  from compilation.
+
+server.ts
+  Purpose: Application entry point for the backend server.
+  What it does: Imports reflect-metadata for TypeORM, initializes the database
+  via initDb(), creates an Express app and HTTP server, mounts an Apollo
+  GraphQL server with the schema and resolvers, and exposes /graphql with CORS
+  and JSON body parsing. Listens on PORT (default 4000) and logs when ready.
+
+vitest.config.ts
+  Purpose: Vitest test runner configuration.
+  What it does: Tells Vitest to run tests in backend/tests/**/*.test.ts in
+  Node environment, with globals enabled. Defines an optional path alias
+  @backend for imports. Used by npm run test and npm run test:watch.
+
+.gitignore
+  Purpose: Tells Git which paths to ignore.
+  What it does: Ignores node_modules/, dist/, frontend/dist/, SQLite files in
+  data/, env files, logs, OS/IDE artifacts, and similar so they are not
+  committed.
+
+README.md
+  Purpose: Project documentation for running the app.
+  What it does: Describes how to run the backend (npm install, build, start)
+  and the frontend (cd frontend, npm install, npm run dev), and explains
+  database setup on first run (automatic creation of data/ and schema via
+  TypeORM synchronize).
+
+requirements.txt
+  Purpose: Human-readable specification of the application requirements.
+  What it does: Contains the original Senior Engineer Coding Exercise text:
+  tech stack (React, Apollo Client/Server, TypeORM, SQLite), page requirements
+  (/loans, /loan/:id), bullet loan logic, data model, GraphQL API, and setup
+  notes. Not executed by the app; used as the product spec.
+
+html_prime_example.html (optional, may be at project root)
+  Purpose: Reference HTML for the FRED prime rate page structure.
+  What it does: A saved copy of the HTML from https://fred.stlouisfed.org/series/PRIME
+  used to develop the prime rate scraper. A minimal fixture with the same key
+  structure lives in backend/tests/fixtures/html_prime_example.html for tests.
+
+--------------------------------------------------------------------------------
+BACKEND (backend/)
+--------------------------------------------------------------------------------
+
+backend/db.ts
+  Purpose: Database connection and initialization for TypeORM.
+  What it does: Configures a DataSource for SQLite using better-sqlite3, with
+  the database file at data/loans.sqlite (relative to process cwd). Registers
+  Loan and Payment entities and uses synchronize: true to create/update
+  tables. initDb() ensures the data/ directory exists, then initializes the
+  DataSource if not already done.
+
+backend/schema.ts
+  Purpose: GraphQL schema definition for the API.
+  What it does: Defines the schema as a string: types Loan, Payment, LoansPage;
+  Query (loans with offset/limit, loan(id), primeRate); input CreateLoanInput;
+  Mutation createLoan. Describes the shape of data the client can request and
+  the arguments for queries and mutations.
+
+backend/resolvers.ts
+  Purpose: GraphQL resolvers that implement the schema.
+  What it does: Implements Query.loans (paginated via getLoansPaginated),
+  Query.loan (single loan by id), Query.primeRate (current prime rate percent);
+  Mutation.createLoan (creates loan and schedule via loanService). Also
+  resolves Loan and Payment field types (e.g. converting decimal strings to
+  numbers, computing totalExpectedInterest, sorting payments by date).
+
+backend/loanService.ts
+  Purpose: Business logic for loan creation and retrieval.
+  What it does: createLoan() validates startDate <= endDate (throws otherwise),
+  then branches: if start is in the future, uses getCurrentPrimeRateAsDecimal()
+  and generateBulletSchedule(); if start is in the past, fetches prime history
+  via scrapePrimeRateForDates() and uses generateBulletScheduleWithPrimeHistory()
+  so each payment period uses the correct historical prime rates. Saves the Loan
+  and all Payment rows and returns the loan.
+  getLoansPaginated() and getLoanById() read from the database with
+  relations. totalExpectedInterest() sums the interest components of a loan’s
+  payments.
+
+backend/primeRate.ts
+  Purpose: Provides the current prime rate for loan creation and the GraphQL API.
+  What it does: getCurrentPrimeRateAsDecimal() calls scrapeCurrentPrimeRate() from
+  the scraper and returns the rate as a decimal (e.g. 0.0675 for 6.75%) by dividing
+  by 100. Used by loanService for createLoan and by the GraphQL primeRate query.
+  No fixed fallback; the scraper throws if fetch or parse fails.
+
+backend/bulletLoan.ts
+  Purpose: Bullet loan repayment schedule calculation (no external libraries).
+  What it does: Two entry points: generateBulletSchedule() for a single fixed
+  rate (future loans); generateBulletScheduleWithPrimeHistory() for past loans
+  using scraped prime observations and an initial rate. Implements 30/360:
+  interest-only payments on the last day of each calendar month; principal plus
+  final interest on the end date. When prime changes during a period, interest
+  is prorated by days at each rate. Returns ScheduleRow[] (paymentDate,
+  paymentType, principalComponent, interestComponent, totalAmount,
+  remainingBalance, primeRateRange).
+
+backend/entities/Loan.ts
+  Purpose: TypeORM entity for the loans table.
+  What it does: Defines the Loan table with columns: id (UUID), name,
+  principalAmount, startDate, endDate, annualRate, createdAt. Has a
+  one-to-many relation to Payment. Used by TypeORM for persistence and
+  by resolvers for GraphQL.
+
+backend/entities/Payment.ts
+  Purpose: TypeORM entity for the payments table (repayment schedule rows).
+  What it does: Defines the Payment table with columns: id, loanId,
+  paymentDate, paymentType, principalComponent, interestComponent,
+  totalAmount, remainingBalance, and a many-to-one relation to Loan.
+  Uses string entity name "Loan" to avoid circular import. Used for
+  storing the output of generateBulletSchedule.
+
+backend/scrapers/primeScraper.ts
+  Purpose: Fetches prime rate data from FRED by scraping. Two exports.
+  What it does: (1) scrapeCurrentPrimeRate() fetches FRED_PRIME_URL (series page),
+  parses the span with class series-meta-observation-value, and returns the
+  latest prime rate in percent (e.g. 6.75). (2) scrapePrimeRateForDates(startDate,
+  endDate) fetches FRED_PRIME_DATA_URL (data page), parses table#data-table-observations
+  (DATE | VALUE rows), finds the first change in range and the rate before it as
+  initialRatePercent, returns observations in range plus initialRatePercent. Throws
+  if no data exists before start date. Used by primeRate.ts and loanService.
+
+backend/tests/fixtures/html_prime_example.html
+  Purpose: Mock FRED series page HTML for current-prime tests.
+  What it does: Minimal HTML containing <span class="series-meta-observation-value">6.75</span>
+  so that primeRate tests can stub fetch and assert getCurrentPrimeRateAsDecimal()
+  returns 0.0675 without hitting the real FRED URL.
+
+backend/tests/fixtures/html_prime_full_changes_example.html
+  Purpose: Mock FRED data page HTML for scrapePrimeRateForDates tests.
+  What it does: Full-page HTML with table#data-table-observations containing
+  DATE and VALUE columns (th/td rows), including 2024-12-20 through 2025-12-11.
+  Used to verify the scraper returns correct initial rate and in-range
+  observations for a loan from 2025-01-01 to 2026-01-01.
+
+backend/tests/primeRate.test.ts
+  Purpose: Unit tests for getCurrentPrimeRateAsDecimal.
+  What it does: Stubs global fetch to return the fixture HTML when the FRED
+  PRIME URL is requested, then dynamically imports primeRate and calls
+  getCurrentPrimeRateAsDecimal(). Asserts the result is 0.0675. Restores
+  globals in afterAll.
+
+backend/tests/primeScraper.test.ts
+  Purpose: Unit tests for scrapeCurrentPrimeRate and scrapePrimeRateForDates.
+  What it does: Stubs fetch for FRED_PRIME_URL (current prime) and
+  FRED_PRIME_DATA_URL (data page HTML tables). Tests success and failure
+  for current prime; tests same-date range, 2-week range, 3-month and
+  multi-year ranges from data page; tests initialRatePercent from latest
+  observation before start; tests throw when data has no observation
+  before start; tests full fixture (2025-01-01 to 2026-01-01) returns
+  initial 7.5 and observations for 2025-09-17, 2025-10-30, 2025-12-11.
+
+backend/tests/bulletLoan.test.ts
+  Purpose: Unit tests for generateBulletSchedule and prime-history schedule.
+  What it does: Uses Vitest to test schedule generation with different
+  start/end dates, same month vs different months, and loan periods.
+  Asserts row count, payment types, principal conservation, zero remaining
+  balance, ascending payment dates, and 30/360 full-month interest.
+  Includes tests for prime-history rate segmentation and segment day count.
+
+backend/tests/createLoan.integration.test.ts
+  Purpose: Full backend integration test for createLoan.
+  What it does: Initializes DB, stubs fetch for FRED (current prime and
+  data page HTML), uses fake time. Creates a $1M loan 2025-01-01 to
+  2026-01-01 and asserts payment schedule (interest per month, Sept/Oct
+  proration, final payment). Also tests that createLoan throws when
+  start date is later than end date.
+
+--------------------------------------------------------------------------------
+FRONTEND (frontend/)
+--------------------------------------------------------------------------------
+
+frontend/package.json
+  Purpose: Frontend dependency and script manifest.
+  What it does: Declares React, React Router, Apollo Client, styled-components,
+  and GraphQL; dev dependencies for Vite, TypeScript, and React types. Scripts:
+  dev (Vite dev server), build (tsc + vite build), preview (vite preview).
+
+frontend/index.html
+  Purpose: HTML shell for the single-page application.
+  What it does: Minimal HTML with a root div and a script tag that loads
+  /src/main.tsx as an ES module. Vite serves this and injects the bundled
+  app.
+
+frontend/vite.config.ts
+  Purpose: Vite build and dev server configuration.
+  What it does: Enables the React plugin, configures the dev server on port
+  5173 and proxies /graphql to the backend at localhost:4000 so the frontend
+  can call the API without CORS issues during development.
+
+frontend/tsconfig.json
+  Purpose: TypeScript configuration for the frontend.
+  What it does: Targets ES2020, uses bundler module resolution, strict mode,
+  and React JSX. Includes only the src/ directory. Used by the IDE and by
+  tsc during the build script.
+
+frontend/tsconfig.node.json
+  Purpose: TypeScript config for Vite config and other Node-run config files.
+  What it does: Applies to vite.config.ts so it type-checks correctly when
+  Vite runs in Node.
+
+frontend/src/main.tsx
+  Purpose: Frontend application entry point.
+  What it does: Renders the root React component into #root, wrapped in
+  ApolloProvider (with the Apollo Client instance), BrowserRouter, and
+  GlobalStyles. Uses React.StrictMode.
+
+frontend/src/App.tsx
+  Purpose: Root component and route definitions.
+  What it does: Renders a Layout that wraps React Router routes: / redirects
+  to /loans; /loans shows LoansPage; /loan/:id shows LoanDetailPage. No
+  other logic; routing and layout live here.
+
+frontend/src/apolloClient.ts
+  Purpose: Apollo Client instance for GraphQL.
+  What it does: Creates an ApolloClient with an HttpLink pointing at /graphql
+  (so the Vite proxy forwards to the backend) and an InMemoryCache. Exported
+  for use in main.tsx’s ApolloProvider.
+
+frontend/src/globalStyles.ts
+  Purpose: Global CSS for the app.
+  What it does: Uses styled-components createGlobalStyle to set box-sizing,
+  body margin/font/background, and #root min-height. Applied once in main.tsx.
+
+frontend/src/vite-env.d.ts
+  Purpose: TypeScript ambient declarations for Vite.
+  What it does: References Vite’s client types so TypeScript recognizes
+  import.meta.env and other Vite-specific globals.
+
+frontend/src/graphql/queries.ts
+  Purpose: GraphQL operation definitions for the frontend.
+  What it does: Defines and exports LOANS_PAGE (paginated loans with
+  totalExpectedInterest), LOAN_DETAIL (single loan with full payment
+  schedule), PRIME_RATE (current prime rate), and CREATE_LOAN mutation.
+  Used by Apollo hooks in pages and components.
+
+frontend/src/pages/LoansPage.tsx
+  Purpose: Loans list page at /loans.
+  What it does: Runs useQuery for loans (paginated) and useQuery for
+  primeRate on load. Renders the page title, “New Loan” button, current
+  prime rate label, and either a loading state, empty state, or a table
+  of loans (name, principal, start date, total expected interest) with
+  pagination. Row click navigates to /loan/:id. Opens NewLoanModal when
+  “New Loan” is clicked.
+
+frontend/src/pages/LoanDetailPage.tsx
+  Purpose: Single loan repayment schedule page at /loan/:id.
+  What it does: Reads :id from the URL, runs useQuery(LOAN_DETAIL) for
+  that loan, and renders a “Back” button to /loans, loan summary (name,
+  principal, dates, rate), and a table of payments (date, type, principal,
+  interest, total, remaining balance). Handles loading and error states.
+
+frontend/src/components/Layout.tsx
+  Purpose: Page layout wrapper.
+  What it does: A styled main wrapper that constrains max-width, centers
+  content, and adds padding. Wraps all route content in App.tsx.
+
+frontend/src/components/NewLoanModal.tsx
+  Purpose: Modal for creating a new loan.
+  What it does: Renders a form with fields: loan name, principal amount,
+  start date, end date. Validates that start date is before or equal to
+  end date; shows an error message and disables submit when invalid.
+  On submit, calls the createLoan mutation; on success calls onCreated
+  (closes modal and refetches loans). Shows date validation and GraphQL
+  error messages. Styled via NewLoanModal.styles.
+
+frontend/src/components/NewLoanModal.styles.ts
+  Purpose: Styled-components for the new-loan modal.
+  What it does: Exports Overlay, ModalBox, ModalTitle, FormGroup, Label,
+  Input, ModalActions, Button, CancelButton, ErrorMessage used by
+  NewLoanModal for layout and appearance.
+
+frontend/src/components/LoansPage.styles.ts
+  Purpose: Styled-components for the loans list page.
+  What it does: Exports PageTitle, Button, TableWrap, Table, Th, Td,
+  RowLink, PaginationWrap, EmptyState used by LoansPage for the list
+  and pagination UI.
+
+frontend/src/components/LoanDetailPage.styles.ts
+  Purpose: Styled-components for the loan detail/schedule page.
+  What it does: Exports PageTitle, BackButton, ScheduleSection, TableWrap,
+  Table, Th, Td used by LoanDetailPage for the schedule table and header.
+
+--------------------------------------------------------------------------------
+END OF FILE EXPLANATIONS
+================================================================================

@@ -5,9 +5,14 @@ import {
   createLoan as createLoanService,
   totalExpectedInterest,
 } from "./loanService.js";
+import { getCurrentPrimeRateAsDecimal } from "./primeRate.js";
 
+/**
+ * GraphQL resolvers: Query (loans, loan, primeRate), Mutation (createLoan), and field resolvers for Loan and Payment.
+ */
 export const resolvers = {
   Query: {
+    /** Returns a paginated list of loans (items, totalCount, hasMore). */
     loans: async (
       _: unknown,
       { offset = 0, limit = 10 }: { offset?: number; limit?: number }
@@ -22,6 +27,9 @@ export const resolvers = {
     },
     loan: async (_: unknown, { id }: { id: string }) => {
       return getLoanById(id);
+    },
+    primeRate: async () => {
+      return getCurrentPrimeRateAsDecimal();
     },
   },
   Mutation: {
@@ -45,12 +53,16 @@ export const resolvers = {
     },
   },
   Payment: {
+    /** Converts stored string to number for GraphQL Float. */
     principalComponent: (parent: { principalComponent: string }) =>
       parseFloat(parent.principalComponent),
+    /** Converts stored string to number for GraphQL Float. */
     interestComponent: (parent: { interestComponent: string }) =>
       parseFloat(parent.interestComponent),
+    /** Converts stored string to number for GraphQL Float. */
     totalAmount: (parent: { totalAmount: string }) =>
       parseFloat(parent.totalAmount),
+    /** Converts stored string to number for GraphQL Float. */
     remainingBalance: (parent: { remainingBalance: string }) =>
       parseFloat(parent.remainingBalance),
   },

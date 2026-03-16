@@ -1,6 +1,6 @@
 import { useQuery } from "@apollo/client/react";
 import { useParams, useNavigate } from "react-router-dom";
-import { LOAN_DETAIL } from "../graphql/queries";
+import { LOAN_DETAIL, PRIME_RATE } from "../graphql/queries";
 import {
   PageTitle,
   BackButton,
@@ -11,9 +11,11 @@ import {
   ScheduleSection,
 } from "../components/LoanDetailPage.styles";
 
+/** Page that shows a single loan's details and payment schedule (uses route param :id). */
 export function LoanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { data: primeData } = useQuery<{ primeRate: number }>(PRIME_RATE);
   const { data, loading, error } = useQuery<{
     loan: {
       id: string;
@@ -31,6 +33,7 @@ export function LoanDetailPage() {
         interestComponent: number;
         totalAmount: number;
         remainingBalance: number;
+        primeRateRange: string | null;
       }>;
     };
   }>(LOAN_DETAIL, {
@@ -67,7 +70,10 @@ export function LoanDetailPage() {
       <BackButton onClick={() => navigate("/loans")}>← Back</BackButton>
       <PageTitle>{loan.name}</PageTitle>
       <p>
-        Principal: {formatCurrency(loan.principalAmount)} · Start: {loan.startDate} · End: {loan.endDate} · Rate: {(loan.annualRate * 100).toFixed(2)}%
+        Principal: {formatCurrency(loan.principalAmount)} · Start: {loan.startDate} · End: {loan.endDate} · Loan rate (at creation): {(loan.annualRate * 100).toFixed(2)}%
+        {primeData?.primeRate != null && (
+          <> · Current prime rate: {(primeData.primeRate * 100).toFixed(2)}%</>
+        )}
       </p>
 
       <ScheduleSection>
@@ -81,6 +87,7 @@ export function LoanDetailPage() {
                 <tr>
                   <Th>Payment date</Th>
                   <Th>Payment type</Th>
+                  <Th>Prime rate range</Th>
                   <Th>Principal</Th>
                   <Th>Interest</Th>
                   <Th>Total</Th>
@@ -96,10 +103,12 @@ export function LoanDetailPage() {
                   interestComponent: number;
                   totalAmount: number;
                   remainingBalance: number;
+                  primeRateRange: string | null;
                 }) => (
                   <tr key={p.id}>
                     <Td>{p.paymentDate}</Td>
                     <Td>{p.paymentType}</Td>
+                    <Td>{p.primeRateRange ?? "—"}</Td>
                     <Td>{formatCurrency(p.principalComponent)}</Td>
                     <Td>{formatCurrency(p.interestComponent)}</Td>
                     <Td>{formatCurrency(p.totalAmount)}</Td>

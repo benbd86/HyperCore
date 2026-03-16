@@ -48,3 +48,19 @@ The app uses **SQLite** with TypeORM. You do not need to create the database or 
 2. **No extra steps** are required: install dependencies, then run the backend as in “Running the backend” above. The database is ready to use as soon as the server prints “Server ready at …”.
 
 To reset the database, stop the backend, delete `data/loans.sqlite` (and the `data/` folder if you like), then start the backend again so it recreates the file and schema.
+
+---
+
+## Unclear Instructions:
+
+1. Loans can be created retrospectively (Past/Future/On going loans).
+2. Why not just scrape the historical data once and store it, then dynamically update latest values and apply for new loans from DB? Fetch changes in date range and apply.
+
+---
+
+## Assumptions And Notes:
+
+1. If start day and end day is the same day - The first month's interest and the last month's interest should sum to a 30 day interest (will seem like a 2 part payment for a month).
+2. Last payment will occur on the end date of the loan (not on last day of the month like other payments).
+3. On loan creation - if any value of prime rate is failed to be fetched, fail the new loan creation.
+4. If a loan was taken on the last month's day, the interest for that month will be 0 (no full day of loan occurred).

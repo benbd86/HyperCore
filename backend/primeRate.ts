@@ -1,16 +1,30 @@
 /**
- * Prime rate for loan creation.
- * Currently returns a fixed rate of 6.75% (as decimal 0.0675).
- * TODO: Implement FRED API or scraping to fetch the Daily Prime Rate.
+ * Prime rate for loan creation and date ranges. Fetches the Bank Prime Loan Rate from FRED via scraping.
  */
+import {
+  scrapeCurrentPrimeRate,
+  scrapePrimeRateForDates,
+  type PrimeRateForDatesResult,
+} from "./scrapers/primeScraper.js";
 
-/** Fixed annual prime rate in percent (e.g. 6.75 = 6.75%). */
-const FIXED_PRIME_RATE_PERCENT = 6.75;
+const PERCENT_TO_DECIMAL = 100;
 
 /**
  * Returns the current prime rate as a decimal (e.g. 0.0675 for 6.75%).
- * Used when creating a new loan.
+ * Used when creating a new loan and for the GraphQL primeRate query.
  */
 export async function getCurrentPrimeRateAsDecimal(): Promise<number> {
-  return FIXED_PRIME_RATE_PERCENT / 100;
+  const ratePercent = await scrapeCurrentPrimeRate();
+  return ratePercent / PERCENT_TO_DECIMAL;
+}
+
+/**
+ * Returns prime rate history for a date range: initial rate (percent) and observations in range.
+ * Used when creating a loan that started in the past so the schedule uses historical prime rates.
+ */
+export async function getPrimeRateForDateRange(
+  startDate: string,
+  endDate: string
+): Promise<PrimeRateForDatesResult> {
+  return scrapePrimeRateForDates(startDate, endDate);
 }
