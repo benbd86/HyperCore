@@ -95,20 +95,20 @@ describe("createLoan integration", () => {
       expect(p.primeRateRange).toBe("7.50%");
     }
 
-    // Sept: 16 days 7.5% + 14 days 7.25% (rate change on 17th = first day at 7.25%; 30/360 inclusive)
+    // Sept: matches bulletLoan `calculateInterest` — 17 days 7.5% + 13 days 7.25% (calendar days in Sept)
     const septInterest =
-      (1_000_000 * (7.5 / 360) * 16) / 100 +
-      (1_000_000 * (7.25 / 360) * 14) / 100;
+      (1_000_000 * (7.5 / 100 / 12) * (17 / 30)) +
+      (1_000_000 * (7.25 / 100 / 12) * (13 / 30));
     const septPayment = payments.find((p) => p.paymentDate === "2025-09-30");
     expect(septPayment).toBeDefined();
     expect(round2(toNum(septPayment!.interestComponent))).toBe(round2(septInterest));
     expect(septPayment!.primeRateRange).toContain("7.25");
     expect(septPayment!.primeRateRange).toContain("7.50");
 
-    // Oct: 29 days 7.25% + 1 day 7% (change on 30th; 30/360 gives 1 day for Oct 30–31)
+    // Oct: 30 days 7.25% + 1 day 7% (change on 30th; prorated by calendar days in October)
     const octInterest =
-      (1_000_000 * (7.25 / 360) * 29) / 100 +
-      (1_000_000 * (7 / 360) * 1) / 100;
+      (1_000_000 * (7.25 / 100 / 12) * (30 / 31)) +
+      (1_000_000 * (7 / 100 / 12) * (1 / 31));
     const octPayment = payments.find((p) => p.paymentDate === "2025-10-31");
     expect(octPayment).toBeDefined();
     expect(round2(toNum(octPayment!.interestComponent))).toBe(round2(octInterest));
@@ -121,10 +121,10 @@ describe("createLoan integration", () => {
     expect(round2(toNum(novPayment!.interestComponent))).toBe(5833.33);
     expect(novPayment!.primeRateRange).toBe("7.00%");
 
-    // Dec: 10 days 7% + 20 days 6.75% (change on 11th)
+    // Dec: 11 days 7% + 20 days 6.75% (change on 11th; prorated by calendar days in December)
     const decInterest =
-      (1_000_000 * (7 / 360) * 10) / 100 +
-      (1_000_000 * (6.75 / 360) * 20) / 100;
+      (1_000_000 * (7 / 100 / 12) * (11 / 31)) +
+      (1_000_000 * (6.75 / 100 / 12) * (20 / 31));
     const decPayment = payments.find((p) => p.paymentDate === "2025-12-31");
     expect(decPayment).toBeDefined();
     expect(round2(toNum(decPayment!.interestComponent))).toBe(round2(decInterest));
@@ -137,7 +137,7 @@ describe("createLoan integration", () => {
     expect(finalPayment!.paymentType).toBe("Principal + Interest");
     expect(round2(toNum(finalPayment!.principalComponent))).toBe(1_000_000);
     expect(round2(toNum(finalPayment!.remainingBalance))).toBe(0);
-    const finalDayInterest = (1_000_000 * (6.75 / 360) * 1) / 100;
+    const finalDayInterest = (1_000_000 * (6.75 / 100 / 12) * (1 / 31));
     expect(round2(toNum(finalPayment!.interestComponent))).toBe(round2(finalDayInterest));
     expect(round2(toNum(finalPayment!.totalAmount))).toBe(1_000_000 + round2(finalDayInterest));
   });

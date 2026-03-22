@@ -14,7 +14,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: first day | EndDate: last day | Same month: false | Period: full year
   it("start first day, end last day, different months, full year", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-01",
       "2025-12-31"
@@ -30,7 +30,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: first day | EndDate: last day | Same month: false | Period: full few years
   it("start first day, end last day, different months, full few years", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-01",
       "2026-12-31"
@@ -43,7 +43,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: first day | EndDate: last day | Same month: false | Period: few months less than a year
   it("start first day, end last day, different months, few months less than a year", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-01",
       "2025-08-31"
@@ -56,7 +56,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: first day | EndDate: last day | Same month: false | Period: few months longer than a year
   it("start first day, end last day, different months, few months longer than a year", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-01",
       "2026-03-31"
@@ -69,7 +69,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: first day | EndDate: first day | Same month: false | Period: few months
   it("start first day, end first day next month", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-01",
       "2025-04-01"
@@ -82,7 +82,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: first day | EndDate: random day | Same month: false | Period: few months
   it("start first day, end random day (not month-end)", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-01",
       "2025-06-15"
@@ -95,7 +95,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: last day (day 31) | EndDate: last day (day 31) | Same month: true
   it("start last day (31), end last day (31), same month", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-31",
       "2025-01-31"
@@ -106,9 +106,9 @@ describe("createLoanSchedule (single rate)", () => {
     expect(rows[0].remainingBalance).toBe(0);
   });
 
-  // Start date last day of month: first payment (same calendar month) has zero interest (0 days in 30/360)
-  it("first payment has zero interest when start date is last day of month", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+  // Start date last day of month: first period is Jan 31–Jan 31 (one calendar day in January)
+  it("first payment when start is last day of month accrues one day of interest", async () => {
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-31",
       "2025-03-31"
@@ -116,7 +116,8 @@ describe("createLoanSchedule (single rate)", () => {
     const firstRow = rows[0];
     expect(firstRow.paymentDate).toBe("2025-01-31");
     expect(firstRow.paymentType).toBe("Interest");
-    expect(firstRow.interestComponent).toBe(0);
+    const oneDayJanInterest = principal * (annualRate / 12) * (1 / 31);
+    expect(firstRow.interestComponent).toBeCloseTo(oneDayJanInterest, 5);
     expect(firstRow.principalComponent).toBe(0);
     // Second payment (Feb) is a full month: full interest
     const secondRow = rows[1];
@@ -127,7 +128,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: last day (day 28, not >30) | EndDate: last day (28) | Same month: true
   it("start last day (28 Feb), end last day (28), same month", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-02-28",
       "2025-02-28"
@@ -139,7 +140,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: last day (31) | EndDate: last day (30) | Same month: false | Period: full year
   it("start last day (31 Jan), end last day (30 Dec), different months, full year", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-31",
       "2025-12-31"
@@ -151,7 +152,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: last day (31) | EndDate: last day (31) | Same month: false | Period: few months
   it("start last day (31), end last day (31), different months, few months", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-31",
       "2025-03-31"
@@ -165,7 +166,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: random day | EndDate: last day | Same month: true
   it("start random day, end last day, same month", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-15",
       "2025-01-31"
@@ -178,7 +179,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: random day | EndDate: random day | Same month: true (end not month-end)
   it("start random day, end random day, same month (final payment on end date)", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-15",
       "2025-01-25"
@@ -191,7 +192,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: first day | EndDate: last day | Same month: true
   it("start first day, end last day, same month", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-01",
       "2025-01-31"
@@ -203,7 +204,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: random day | EndDate: first day | Same month: false
   it("start random day, end first day next month", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-15",
       "2025-02-01"
@@ -216,7 +217,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: last day (31) | EndDate: random day | Same month: false
   it("start last day (31), end random day, different months", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-31",
       "2025-05-15"
@@ -228,7 +229,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // StartDate: random day | EndDate: last day | Same month: false | Period: full year
   it("start random day, end last day, different months, full year", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-15",
       "2025-12-31"
@@ -242,7 +243,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // Payment dates ascending; sum principal = initial principal; last remaining balance zero
   it("payment dates ascending and principal conserved", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       75_000,
       "2025-01-10",
       "2025-12-31"
@@ -259,7 +260,7 @@ describe("createLoanSchedule (single rate)", () => {
 
   // 30/360: full month interest = principal * (annualRate/12)
   it("30/360 full month interest equals principal * (annualRate/12)", async () => {
-    const { schedule: rows } = await createLoanSchedule(
+    const rows = await createLoanSchedule(
       principal,
       "2025-01-01",
       "2025-04-30"
