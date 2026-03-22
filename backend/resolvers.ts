@@ -35,12 +35,13 @@ export const resolvers = {
   Mutation: {
     createLoan: async (
       _: unknown,
-      { input }: { input: { name: string; principalAmount: number; startDate: string; endDate: string } }
+      { input }: { input: { name: string; loanSource: string; principalAmount: number; startDate: string; endDate: string } }
     ) => {
       return createLoanService(input);
     },
   },
   Loan: {
+    loanSource: (parent: Loan) => parent.loanSource ?? "",
     principalAmount: (parent: Loan) => parseFloat(parent.principalAmount),
     annualRate: (parent: Loan) => parseFloat(parent.annualRate),
     totalExpectedInterest: (parent: Loan) => totalExpectedInterest(parent),
@@ -65,5 +66,8 @@ export const resolvers = {
     /** Converts stored string to number for GraphQL Float. */
     remainingBalance: (parent: { remainingBalance: string }) =>
       parseFloat(parent.remainingBalance),
+    /** DB may be null; GraphQL always returns an Int (0 when unset). */
+    effectiveDays: (parent: { effectiveDays: number | null }) =>
+      parent.effectiveDays ?? 0,
   },
 };

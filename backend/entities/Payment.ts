@@ -33,6 +33,9 @@ export class Payment {
   @Column({ type: "decimal", precision: 18, scale: 2 })
   interestComponent!: string;
 
+  @Column({ type: "integer", nullable: true })
+  effectiveDays!: number | null;
+
   @Column({ type: "decimal", precision: 18, scale: 2 })
   totalAmount!: string;
 

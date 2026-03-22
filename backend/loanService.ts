@@ -5,7 +5,8 @@ import { createLoanSchedule } from "./bulletLoan.js";
 import { getCurrentPrimeRateAsDecimal } from "./primeRate.js";
 
 export interface CreateLoanInput {
-  name: string;
+  name: string; 
+  loanSource: string;
   principalAmount: number;
   startDate: string;
   endDate: string;
@@ -34,6 +35,7 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
 
   const loan = repo.create({
     name: input.name,
+    loanSource: input.loanSource,
     principalAmount: String(input.principalAmount),
     startDate: input.startDate,
     endDate: input.endDate,
@@ -51,6 +53,7 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
       totalAmount: String(row.totalAmount),
       remainingBalance: String(row.remainingBalance),
       primeRateRange: row.primeRateRange,
+      effectiveDays: row.effectiveDays,
     });
     await paymentRepo.save(payment);
   }

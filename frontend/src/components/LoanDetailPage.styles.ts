@@ -4,6 +4,7 @@ export const PageTitle = styled.h1`
   margin: 0 0 8px 0;
   font-size: 1.5rem;
   font-weight: 600;
+  color: var(--text-primary);
 `;
 
 export const BackButton = styled.button`
@@ -11,12 +12,21 @@ export const BackButton = styled.button`
   margin-bottom: 16px;
   font-size: 0.9rem;
   background: transparent;
-  color: #2563eb;
-  border: 1px solid #2563eb;
+  color: var(--link);
+  border: 1px solid var(--link);
   border-radius: 6px;
   cursor: pointer;
   &:hover {
-    background: #eff6ff;
+    background: var(--link-hover-bg);
+  }
+`;
+
+export const MetaBlock = styled.div`
+  color: var(--text-primary);
+  line-height: 1.6;
+  p {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
   }
 `;
 
@@ -26,14 +36,19 @@ export const ScheduleSection = styled.section`
     font-size: 1.125rem;
     font-weight: 600;
     margin: 0 0 12px 0;
+    color: var(--text-primary);
+  }
+  p {
+    color: var(--text-muted);
   }
 `;
 
 export const TableWrap = styled.div`
   overflow-x: auto;
-  background: white;
+  background: var(--bg-elevated);
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
 `;
 
 export const Table = styled.table`
@@ -45,11 +60,25 @@ export const Th = styled.th`
   text-align: left;
   padding: 12px 16px;
   font-weight: 600;
-  color: #374151;
-  border-bottom: 2px solid #e5e7eb;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border);
+  background: var(--bg-elevated);
 `;
 
 export const Td = styled.td`
   padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+`;
+
+export const LoadingText = styled.p`
+  color: var(--text-muted);
+`;
+
+export const ErrorText = styled.p`
+  color: var(--error);
+  background: var(--error-bg);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
 `;

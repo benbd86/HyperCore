@@ -20,6 +20,7 @@ export interface ScheduleRow {
   remainingBalance: number;
   /** Prime rate range in effect for this payment period (e.g. "7.25%" or "7.00% - 7.25%"). */
   primeRateRange: string;
+  effectiveDays: number;
 }
 
 /**
@@ -92,7 +93,6 @@ function createPaymentsSchedule(
   while (current <= endMonth) {
     const isLastPayment = current.getMonth() === endMonth.getMonth() && current.getFullYear() === endMonth.getFullYear();
     const paymentDate = isLastPayment ? end : lastDayOfMonth(current.getFullYear(), current.getMonth());
-
     const { initialRatePercent, relevantObservations } = getRelevantRatesForPayment(
       effectiveRate,
       toDateStr(periodStartDate),
@@ -103,7 +103,7 @@ function createPaymentsSchedule(
     // Update effective rate for next month.
     effectiveRate = relevantObservations.length > 0 ? relevantObservations[relevantObservations.length - 1].value : initialRatePercent;
 
-    const { interest, primeRateRange } = interestAndPrimeRangeForMonth(
+    const { interest, primeRateRange , effectiveDays} = interestAndPrimeRangeForMonth(
       principal,
       periodStartDate,
       paymentDate,
@@ -122,6 +122,7 @@ function createPaymentsSchedule(
       totalAmount,
       remainingBalance: balance,
       primeRateRange,
+      effectiveDays,
     });
 
     periodStartDate.setDate(paymentDate.getDate() + 1);
@@ -150,14 +151,14 @@ function interestAndPrimeRangeForMonth(
   periodEnd: Date,
   initialPercent: number,
   observations: PrimeRateObservation[],
-): { interest: number; primeRateRange: string } {
+): { interest: number; primeRateRange: string , effectiveDays: number } {
 
   const daysInMonth = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0).getDate() - new Date(periodStart.getFullYear(), periodStart.getMonth(), 1).getDate() + 1;
   
   // No changes during that month - use fixed rate.
   if (observations.length === 0) {
     const effectiveDays = periodEnd.getDate() - periodStart.getDate() + 1;
-    return { interest: calculateInterest(principal, initialPercent, daysInMonth, effectiveDays), primeRateRange: `${initialPercent.toFixed(2)}%` };
+    return { interest: calculateInterest(principal, initialPercent, daysInMonth, effectiveDays), primeRateRange: `${initialPercent.toFixed(2)}%` , effectiveDays: effectiveDays};
   }
 
   // Calculate interest for changing rate.
@@ -182,7 +183,7 @@ function interestAndPrimeRangeForMonth(
   // Add latest section's interest
   interestSum += calculateInterest(principal, currentRate, daysInMonth, periodEnd.getDate() - latestPeriodStartDate.getDate() + 1);
   
-  return { interest: interestSum, primeRateRange: `${minRate.toFixed(2)}% - ${maxRate.toFixed(2)}%` };
+  return { interest: interestSum, primeRateRange: `${minRate.toFixed(2)}% - ${maxRate.toFixed(2)}%` , effectiveDays: daysInMonth};
 }
 
 function calculateInterest(

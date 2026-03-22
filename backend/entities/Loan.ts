@@ -14,6 +14,10 @@ export class Loan {
   @Column({ type: "varchar", length: 255 })
   name!: string;
 
+  /** Nullable in DB; GraphQL exposes non-null via resolver (`?? ""`). */
+  @Column({ type: "varchar", length: 255, nullable: true })
+  loanSource!: string | null;
+
   @Column({ type: "decimal", precision: 18, scale: 2 })
   principalAmount!: string;
 
@@ -27,7 +31,7 @@ export class Loan {
   @Column({ type: "decimal", precision: 10, scale: 6 })
   annualRate!: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "date" })
   createdAt!: Date;
 
   @OneToMany("Payment", (p: any) => p.loan)

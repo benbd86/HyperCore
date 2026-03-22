@@ -3,7 +3,7 @@ import styled from "styled-components";
 export const Overlay = styled.div`
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -12,18 +12,21 @@ export const Overlay = styled.div`
 `;
 
 export const ModalBox = styled.div`
-  background: white;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
   border-radius: 8px;
   padding: 24px;
   max-width: 400px;
   width: 100%;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-modal);
+  border: 1px solid var(--border);
 `;
 
 export const ModalTitle = styled.h2`
   margin: 0 0 20px 0;
   font-size: 1.25rem;
   font-weight: 600;
+  color: var(--text-primary);
 `;
 
 export const FormGroup = styled.div`
@@ -34,7 +37,7 @@ export const Label = styled.label`
   display: block;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-secondary);
   margin-bottom: 4px;
 `;
 
@@ -42,12 +45,17 @@ export const Input = styled.input`
   width: 100%;
   padding: 8px 12px;
   font-size: 0.95rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  &::placeholder {
+    color: var(--text-muted);
+  }
   &:focus {
     outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 2px var(--focus-ring);
   }
 `;
 
@@ -61,26 +69,26 @@ export const ModalActions = styled.div`
 export const CancelButton = styled.button`
   padding: 8px 16px;
   font-size: 0.95rem;
-  background: #f3f4f6;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  background: var(--bg-button-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   cursor: pointer;
   &:hover {
-    background: #e5e7eb;
+    background: var(--bg-button-secondary-hover);
   }
 `;
 
 export const Button = styled.button`
   padding: 8px 16px;
   font-size: 0.95rem;
-  background: #2563eb;
-  color: white;
+  background: var(--accent);
+  color: #ffffff;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   &:hover:not(:disabled) {
-    background: #1d4ed8;
+    background: var(--accent-hover);
   }
   &:disabled {
     opacity: 0.6;
@@ -89,7 +97,7 @@ export const Button = styled.button`
 `;
 
 export const ErrorMessage = styled.p`
-  color: #b91c1c;
+  color: var(--error);
   font-size: 0.875rem;
   margin: 8px 0 0 0;
 `;

@@ -24,6 +24,7 @@ interface NewLoanModalProps {
 /** Modal form to create a new loan (name, principal, start/end dates); calls onCreated on success and onClose to dismiss. */
 export function NewLoanModal({ onClose, onCreated }: NewLoanModalProps) {
   const [name, setName] = useState("");
+  const [loanSource, setLoanSource] = useState("");
   const [principalAmount, setPrincipalAmount] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -48,6 +49,7 @@ export function NewLoanModal({ onClose, onCreated }: NewLoanModalProps) {
       variables: {
         input: {
           name: name.trim(),
+          loanSource: loanSource.trim(),
           principalAmount: principal,
           startDate,
           endDate,
@@ -69,6 +71,16 @@ export function NewLoanModal({ onClose, onCreated }: NewLoanModalProps) {
               onChange={(e) => setName(e.target.value)}
               required
               placeholder="e.g. Business Loan"
+            />
+          </FormGroup>
+          <FormGroup>
+            <Label htmlFor="loan-source">Loan source</Label>
+            <Input
+              id="loan-source"
+              value={loanSource}
+              onChange={(e) => setLoanSource(e.target.value)}
+              required
+              placeholder="e.g. A Capital"
             />
           </FormGroup>
           <FormGroup>

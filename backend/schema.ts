@@ -5,7 +5,9 @@ const typeDefs = `#graphql
   type Loan {
     id: ID!
     name: String!
+    loanSource: String!
     principalAmount: Float!
+    createdAt: String!
     startDate: String!
     endDate: String!
     annualRate: Float!
@@ -23,6 +25,7 @@ const typeDefs = `#graphql
     totalAmount: Float!
     remainingBalance: Float!
     primeRateRange: String
+    effectiveDays: Int!
   }
 
   type LoansPage {
@@ -39,6 +42,7 @@ const typeDefs = `#graphql
 
   input CreateLoanInput {
     name: String!
+    loanSource: String!
     principalAmount: Float!
     startDate: String!
     endDate: String!

@@ -7,7 +7,9 @@ export const LOANS_PAGE = gql`
       items {
         id
         name
+        loanSource
         principalAmount
+        createdAt
         startDate
         endDate
         totalExpectedInterest
@@ -23,7 +25,9 @@ export const LOAN_DETAIL = gql`
     loan(id: $id) {
       id
       name
+      loanSource
       principalAmount
+      createdAt
       startDate
       endDate
       annualRate
@@ -37,6 +41,7 @@ export const LOAN_DETAIL = gql`
         totalAmount
         remainingBalance
         primeRateRange
+        effectiveDays
       }
     }
   }
@@ -53,6 +58,7 @@ export const CREATE_LOAN = gql`
     createLoan(input: $input) {
       id
       name
+      loanSource
       principalAmount
       startDate
       endDate

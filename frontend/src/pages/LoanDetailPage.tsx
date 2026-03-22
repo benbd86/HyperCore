@@ -9,6 +9,9 @@ import {
   Th,
   Td,
   ScheduleSection,
+  MetaBlock,
+  LoadingText,
+  ErrorText,
 } from "../components/LoanDetailPage.styles";
 
 /** Page that shows a single loan's details and payment schedule (uses route param :id). */
@@ -20,7 +23,9 @@ export function LoanDetailPage() {
     loan: {
       id: string;
       name: string;
+      loanSource: string;
       principalAmount: number;
+      createdAt: string;
       startDate: string;
       endDate: string;
       annualRate: number;
@@ -34,6 +39,7 @@ export function LoanDetailPage() {
         totalAmount: number;
         remainingBalance: number;
         primeRateRange: string | null;
+        effectiveDays: number;
       }>;
     };
   }>(LOAN_DETAIL, {
@@ -48,7 +54,7 @@ export function LoanDetailPage() {
       <div>
         <BackButton onClick={() => navigate("/loans")}>← Back</BackButton>
         <PageTitle>Loan</PageTitle>
-        <p style={{ color: "#c00" }}>Error: {error.message}</p>
+        <ErrorText>Error: {error.message}</ErrorText>
       </div>
     );
   }
@@ -58,7 +64,7 @@ export function LoanDetailPage() {
       <div>
         <BackButton onClick={() => navigate("/loans")}>← Back</BackButton>
         <PageTitle>Loan</PageTitle>
-        <p>Loading…</p>
+        <LoadingText>Loading…</LoadingText>
       </div>
     );
   }
@@ -69,12 +75,22 @@ export function LoanDetailPage() {
     <div>
       <BackButton onClick={() => navigate("/loans")}>← Back</BackButton>
       <PageTitle>{loan.name}</PageTitle>
-      <p>
-        Principal: {formatCurrency(loan.principalAmount)} · Start: {loan.startDate} · End: {loan.endDate} · Loan rate (at creation): {(loan.annualRate * 100).toFixed(2)}%
-        {primeData?.primeRate != null && (
-          <> · Current prime rate: {(primeData.primeRate * 100).toFixed(2)}%</>
-        )}
-      </p>
+      <MetaBlock>
+        <p>
+          Loan source: {loan.loanSource} · Principal:{" "}
+          {formatCurrency(loan.principalAmount)}
+        </p>
+        <p>
+          Created: {loan.createdAt} · Start: {loan.startDate} · End:{" "}
+          {loan.endDate}
+        </p>
+        <p>
+          Loan rate (at creation): {(loan.annualRate * 100).toFixed(2)}%
+          {primeData?.primeRate != null && (
+            <> · Current prime rate: {(primeData.primeRate * 100).toFixed(2)}%</>
+          )}
+        </p>
+      </MetaBlock>
 
       <ScheduleSection>
         <h2>Repayment schedule</h2>
@@ -92,6 +108,7 @@ export function LoanDetailPage() {
                   <Th>Interest</Th>
                   <Th>Total</Th>
                   <Th>Remaining balance</Th>
+                  <Th>Effective days</Th>
                 </tr>
               </thead>
               <tbody>
@@ -104,6 +121,7 @@ export function LoanDetailPage() {
                   totalAmount: number;
                   remainingBalance: number;
                   primeRateRange: string | null;
+                  effectiveDays: number;
                 }) => (
                   <tr key={p.id}>
                     <Td>{p.paymentDate}</Td>
@@ -113,6 +131,7 @@ export function LoanDetailPage() {
                     <Td>{formatCurrency(p.interestComponent)}</Td>
                     <Td>{formatCurrency(p.totalAmount)}</Td>
                     <Td>{formatCurrency(p.remainingBalance)}</Td>
+                    <Td>{p.effectiveDays}</Td>
                   </tr>
                 ))}
               </tbody>

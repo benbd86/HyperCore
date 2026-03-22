@@ -69,3 +69,4 @@ To reset the database, stop the backend, delete `data/loans.sqlite` (and the `da
 1. Add tests and arrange them.
 2. Add more restrictions and easy shortcuts to FE (e.g like open new loan with focus in name text box).
 3. Make more visually appealing.
+4. Reduce amount of scraping by caching some of the requests (Today's prime rate can be fetched once per day, The list can be cached and created each time the server is starting - with adding updates of new prime - on every prime change).

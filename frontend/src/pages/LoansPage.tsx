@@ -12,6 +12,10 @@ import {
   Button,
   PaginationWrap,
   EmptyState,
+  Filter,
+  FilterInput,
+  LoadingText,
+  ErrorText,
 } from "../components/LoansPage.styles";
 import { NewLoanModal } from "../components/NewLoanModal";
 
@@ -27,7 +31,9 @@ export function LoansPage() {
       items: Array<{
         id: string;
         name: string;
+        loanSource: string;
         principalAmount: number;
+        createdAt: string;
         startDate: string;
         endDate: string;
         totalExpectedInterest: number;
@@ -55,7 +61,7 @@ export function LoansPage() {
     return (
       <div>
         <PageTitle>Loans</PageTitle>
-        <p style={{ color: "#c00" }}>Error: {error.message}</p>
+        <ErrorText>Error: {error.message}</ErrorText>
       </div>
     );
   }
@@ -66,18 +72,32 @@ export function LoansPage() {
       <Button onClick={() => setModalOpen(true)}>New Loan</Button>
 
       {loading ? (
-        <p>Loading…</p>
+        <LoadingText>Loading…</LoadingText>
       ) : loans.length === 0 ? (
         <EmptyState>No loans yet. Create one with “New Loan”.</EmptyState>
       ) : (
         <>
+          <Filter>
+            <FilterInput
+              type="text"
+              id="table-filter-input"
+              onChange={() => tableFilter()}
+              placeholder="Search by loan name"
+            />
+            <Button type="button" onClick={() => clearFilterInput()}>
+              Clear Filter
+            </Button>
+          </Filter>
           <TableWrap>
-            <Table>
+            <Table id="loans-table">
               <thead>
                 <tr>
                   <Th>Loan name</Th>
+                  <Th>Loan source</Th>
                   <Th>Principal</Th>
+                  <Th>Creation date</Th>
                   <Th>Start date</Th>
+                  <Th>End date</Th>
                   <Th>Total expected interest</Th>
                 </tr>
               </thead>
@@ -85,13 +105,15 @@ export function LoansPage() {
                 {loans.map((loan: {
                   id: string;
                   name: string;
+                  loanSource: string;
                   principalAmount: number;
+                  createdAt: string;
                   startDate: string;
                   endDate: string;
                   totalExpectedInterest: number;
                 }) => (
                   <tr key={loan.id}>
-                    <Td>
+                    <Td id="loan-name">
                       <RowLink
                         onClick={() => navigate(`/loan/${loan.id}`)}
                         role="button"
@@ -103,8 +125,11 @@ export function LoansPage() {
                         {loan.name}
                       </RowLink>
                     </Td>
+                    <Td>{loan.loanSource}</Td>
                     <Td>{formatCurrency(loan.principalAmount)}</Td>
+                    <Td>{loan.createdAt}</Td>
                     <Td>{loan.startDate}</Td>
+                    <Td>{loan.endDate}</Td>
                     <Td>{formatCurrency(loan.totalExpectedInterest)}</Td>
                   </tr>
                 ))}
@@ -149,4 +174,32 @@ function formatCurrency(n: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n);
+}
+
+function tableFilter() {
+  const filterInput = document.getElementById('table-filter-input') as HTMLInputElement;
+  const table = document.getElementById('loans-table') as HTMLTableElement;
+  const rows = table.getElementsByTagName('tr');
+
+  for (const row of rows) {
+    const cells = row.getElementsByTagName('td');
+    for (const cell of cells) {
+      if (cell.id === 'loan-name') {
+        if (filterInput.value === '' || (cell.textContent ?? "").toLowerCase().includes(filterInput.value.toLowerCase())) {
+          row.style.display = 'table-row';
+        }
+        else {
+          row.style.display = 'none';
+        }
+      }
+    }
+  }
+}
+
+function clearFilterInput() {
+  const inputElement = document.getElementById('table-filter-input') as HTMLInputElement;
+  if (inputElement) {
+      inputElement.value = '';
+      tableFilter(); // Re-run the filter function to show all rows
+  }
 }
