@@ -2,7 +2,7 @@ import { AppDataSource } from "./db.js";
 import { Loan } from "./entities/Loan.js";
 import { Payment } from "./entities/Payment.js";
 import { createLoanSchedule } from "./bulletLoan.js";
-import { getCurrentPrimeRateAsDecimal } from "./primeRate.js";
+import { getCurrentPrimeRateAsDecimal } from "./primeRateService.js";
 
 export interface CreateLoanInput {
   name: string;

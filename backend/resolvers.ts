@@ -5,7 +5,7 @@ import {
   createLoan as createLoanService,
   totalExpectedInterest,
 } from "./loanService.js";
-import { getCurrentPrimeRateAsDecimal } from "./primeRate.js";
+import { getCurrentPrimeRateAsDecimal } from "./primeRateService.js";
 
 /**
  * GraphQL resolvers: Query (loans, loan, primeRate), Mutation (createLoan), and field resolvers for Loan and Payment.

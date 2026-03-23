@@ -1,7 +1,7 @@
 import {
   getCurrentPrimeRateAsDecimal,
   getPrimeRateForDateRange,
-} from "./primeRate.js";
+} from "./primeRateService.js";
 import type { PrimeRateObservation } from "./scrapers/primeScraper.js";
 import {
   lastDayOfMonth,
@@ -86,12 +86,12 @@ function createPaymentsSchedule(
   let periodStartDate: Date = new Date(startDate);
   let effectiveRate = initialRatePercent;
 
-  let current = new Date(start.getFullYear(), start.getMonth(), 1);
+  let currentMonth = new Date(start.getFullYear(), start.getMonth(), 1);
   const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
 
-  while (current <= endMonth) {
-    const isLastPayment = current.getMonth() === endMonth.getMonth() && current.getFullYear() === endMonth.getFullYear();
-    const paymentDate = isLastPayment ? end : lastDayOfMonth(current.getFullYear(), current.getMonth());
+  while (currentMonth <= endMonth) {
+    const isLastPayment = currentMonth.getMonth() === endMonth.getMonth() && currentMonth.getFullYear() === endMonth.getFullYear();
+    const paymentDate = isLastPayment ? end : lastDayOfMonth(currentMonth.getFullYear(), currentMonth.getMonth());
 
     const { initialRatePercent, relevantObservations } = getRelevantRatesForPayment(
       effectiveRate,
@@ -125,7 +125,7 @@ function createPaymentsSchedule(
     });
 
     periodStartDate.setDate(paymentDate.getDate() + 1);
-    current.setMonth(current.getMonth() + 1);
+    currentMonth.setMonth(currentMonth.getMonth() + 1);
   }
 
   return payments;
