@@ -11,6 +11,7 @@ const typeDefs = `#graphql
     annualRate: Float!
     totalExpectedInterest: Float!
     payments: [Payment!]!
+    workDaysPayments: Int!
   }
 
   type Payment {
@@ -42,6 +43,7 @@ const typeDefs = `#graphql
     principalAmount: Float!
     startDate: String!
     endDate: String!
+    workDaysPayments: Int!
   }
 
   type Mutation {

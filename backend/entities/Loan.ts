@@ -6,6 +6,12 @@ import {
   CreateDateColumn,
 } from "typeorm";
 
+export enum WorkDaysPaymentType {
+  ALLOWED = 0,
+  NEXT_DAY = 1,
+  PREVIOUS_DAY = 2,
+}
+
 @Entity("loans")
 export class Loan {
   @PrimaryGeneratedColumn("uuid")
@@ -32,4 +38,7 @@ export class Loan {
 
   @OneToMany("Payment", (p: any) => p.loan)
   payments!: import("./Payment.js").Payment[];
+
+  @Column({ type: "decimal", nullable: true})
+  workDaysPayments!: number;
 }

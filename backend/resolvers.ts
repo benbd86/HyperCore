@@ -1,4 +1,4 @@
-import { Loan } from "./entities/Loan.js";
+import { Loan, WorkDaysPaymentType } from "./entities/Loan.js";
 import {
   getLoansPaginated,
   getLoanById,
@@ -35,7 +35,7 @@ export const resolvers = {
   Mutation: {
     createLoan: async (
       _: unknown,
-      { input }: { input: { name: string; principalAmount: number; startDate: string; endDate: string } }
+      { input }: { input: { name: string; principalAmount: number; startDate: string; endDate: string , workDaysPayments: WorkDaysPaymentType} }
     ) => {
       return createLoanService(input);
     },
@@ -51,6 +51,7 @@ export const resolvers = {
           new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
       );
     },
+    workDaysPayments: (parent: Loan) => parent.workDaysPayments,
   },
   Payment: {
     /** Converts stored string to number for GraphQL Float. */

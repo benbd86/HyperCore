@@ -31,6 +31,7 @@ export function LoansPage() {
         startDate: string;
         endDate: string;
         totalExpectedInterest: number;
+        workDaysPayments: number;
       }>;
       totalCount: number;
       hasMore: boolean;
@@ -79,6 +80,7 @@ export function LoansPage() {
                   <Th>Principal</Th>
                   <Th>Start date</Th>
                   <Th>Total expected interest</Th>
+                  <Th>Work days payments</Th>
                 </tr>
               </thead>
               <tbody>
@@ -89,6 +91,7 @@ export function LoansPage() {
                   startDate: string;
                   endDate: string;
                   totalExpectedInterest: number;
+                  workDaysPayments: number;
                 }) => (
                   <tr key={loan.id}>
                     <Td>
@@ -106,6 +109,7 @@ export function LoansPage() {
                     <Td>{formatCurrency(loan.principalAmount)}</Td>
                     <Td>{loan.startDate}</Td>
                     <Td>{formatCurrency(loan.totalExpectedInterest)}</Td>
+                    <Td>{loan.workDaysPayments}</Td>
                   </tr>
                 ))}
               </tbody>

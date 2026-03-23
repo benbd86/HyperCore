@@ -3,6 +3,7 @@ import {
   getPrimeRateForDateRange,
 } from "./primeRateService.js";
 import type { PrimeRateObservation } from "./scrapers/primeScraper.js";
+import { WorkDaysPaymentType } from "./entities/Loan.js";
 import {
   lastDayOfMonth,
   toDateStr,
@@ -22,6 +23,8 @@ export interface ScheduleRow {
   primeRateRange: string;
 }
 
+const MILLIS_IN_DAY = 1000 * 60 * 60 * 24; 
+
 /**
  * Only exported schedule entry point.
  * 1) Fetches the prime rate history relevant for the loan dates (future vs past/ongoing).
@@ -31,6 +34,7 @@ export async function createLoanSchedule(
   principalAmount: number,
   startDate: string,
   endDate: string,
+  workDaysPayments: WorkDaysPaymentType,
 ): Promise<ScheduleRow[]> {
 
   const prime = await getRelevantRatesForLoanDates(
@@ -46,6 +50,7 @@ export async function createLoanSchedule(
     endDate,
     initialRatePercent,
     observations,
+    workDaysPayments,
   );
 
   return schedule;
@@ -78,6 +83,7 @@ function createPaymentsSchedule(
   endDate: string,
   initialRatePercent: number,
   observations: PrimeRateObservation[],
+  workDaysPayments: WorkDaysPaymentType,
 ): ScheduleRow[] {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -91,7 +97,7 @@ function createPaymentsSchedule(
 
   while (currentMonth <= endMonth) {
     const isLastPayment = currentMonth.getMonth() === endMonth.getMonth() && currentMonth.getFullYear() === endMonth.getFullYear();
-    const paymentDate = isLastPayment ? end : lastDayOfMonth(currentMonth.getFullYear(), currentMonth.getMonth());
+    const paymentDate = getPaymentDate(currentMonth, isLastPayment, end, workDaysPayments);
 
     const { initialRatePercent, relevantObservations } = getRelevantRatesForPayment(
       effectiveRate,
@@ -124,11 +130,35 @@ function createPaymentsSchedule(
       primeRateRange,
     });
 
-    periodStartDate.setDate(paymentDate.getDate() + 1);
+    periodStartDate.setTime(paymentDate.getTime() + MILLIS_IN_DAY);
     currentMonth.setMonth(currentMonth.getMonth() + 1);
   }
 
   return payments;
+}
+
+function getPaymentDate(currentMonth: Date, isLastPayment: boolean, end: Date, workDaysPayments: WorkDaysPaymentType): Date {
+  const paymentDate = isLastPayment ? end : lastDayOfMonth(currentMonth.getFullYear(), currentMonth.getMonth());
+  
+  if (workDaysPayments === WorkDaysPaymentType.ALLOWED) {
+    return paymentDate;
+  }
+
+  // Check if the payment date is a weekend
+  if (paymentDate.getDay() === 0 || paymentDate.getDay() === 6) {
+
+    if (workDaysPayments === WorkDaysPaymentType.NEXT_DAY) {
+      let daysMove: number = paymentDate.getDay() === 0 ? 1 : 2;
+      paymentDate.setTime(paymentDate.getTime() + daysMove * MILLIS_IN_DAY);
+    }
+
+    if (workDaysPayments === WorkDaysPaymentType.PREVIOUS_DAY) {
+      let daysMove: number = paymentDate.getDay() === 0 ? 2 : 1;
+      paymentDate.setTime(paymentDate.getTime() - daysMove * MILLIS_IN_DAY);
+    }
+  }
+  console.log("paymentDate: ", paymentDate.toISOString());
+  return paymentDate;
 }
 
 function getRelevantRatesForPayment(
@@ -151,13 +181,17 @@ function interestAndPrimeRangeForMonth(
   initialPercent: number,
   observations: PrimeRateObservation[],
 ): { interest: number; primeRateRange: string } {
-
-  const daysInMonth = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0).getDate() - new Date(periodStart.getFullYear(), periodStart.getMonth(), 1).getDate() + 1;
+  const isFullMonth = periodEnd.getMonth() === periodStart.getMonth() && periodStart.getDate() === 1 && periodEnd.getDate() === lastDayOfMonth(periodEnd.getFullYear(), periodEnd.getMonth()).getDate();
+  console.log("isFullMonth: ", isFullMonth);
+  
+  const daysInPeriod = Math.floor((periodEnd.getTime() - periodStart.getTime()) / MILLIS_IN_DAY + 1);
+  console.log("daysInPeriod: ", daysInPeriod);
   
   // No changes during that month - use fixed rate.
   if (observations.length === 0) {
-    const effectiveDays = periodEnd.getDate() - periodStart.getDate() + 1;
-    return { interest: calculateInterest(principal, initialPercent, daysInMonth, effectiveDays), primeRateRange: `${initialPercent.toFixed(2)}%` };
+    const effectiveDays = Math.floor((periodEnd.getTime() - periodStart.getTime()) / MILLIS_IN_DAY) + 1;
+    console.log("effectiveDays: ", effectiveDays);
+    return { interest: calculateInterest(principal, initialPercent, daysInPeriod, effectiveDays, isFullMonth), primeRateRange: `${initialPercent.toFixed(2)}%` };
   }
 
   // Calculate interest for changing rate.
@@ -170,9 +204,10 @@ function interestAndPrimeRangeForMonth(
   for (let i = 0; i < observations.length; i++) {
     const observation = observations[i];
     const changeDate = new Date(observation.date);
-    const effectiveDays = changeDate.getDate() - latestPeriodStartDate.getDate() + 1;
-    latestPeriodStartDate.setDate(changeDate.getDate() + 1);
-    interestSum += calculateInterest(principal, currentRate, daysInMonth, effectiveDays);
+    const effectiveDays = Math.floor(changeDate.getTime() - latestPeriodStartDate.getTime() + 1 * MILLIS_IN_DAY);
+    latestPeriodStartDate.setTime(changeDate.getTime() + 1 * MILLIS_IN_DAY);
+    console.log("effectiveDays: ", effectiveDays);
+    interestSum += calculateInterest(principal, currentRate, daysInPeriod, effectiveDays, isFullMonth);
     currentRate = observation.value;
 
     if (currentRate < minRate) minRate = currentRate;
@@ -180,7 +215,7 @@ function interestAndPrimeRangeForMonth(
   }
  
   // Add latest section's interest
-  interestSum += calculateInterest(principal, currentRate, daysInMonth, periodEnd.getDate() - latestPeriodStartDate.getDate() + 1);
+  interestSum += calculateInterest(principal, currentRate, daysInPeriod, Math.floor(periodEnd.getTime() - latestPeriodStartDate.getTime() + 1 * MILLIS_IN_DAY), isFullMonth);
   
   return { interest: interestSum, primeRateRange: `${minRate.toFixed(2)}% - ${maxRate.toFixed(2)}%` };
 }
@@ -190,7 +225,13 @@ function calculateInterest(
   rate: number,
   daysInMonth: number,
   effectiveDays: number,
+  isFullMonth: boolean,
 ): number {
-  const monthlyRate = rate / 100 / 12;
-  return principal * monthlyRate * (effectiveDays / daysInMonth);
+  if (isFullMonth) {
+    const monthlyRate = rate / 100 / 12;
+    return principal * monthlyRate;
+  }
+
+  const dailyRate = (effectiveDays / 360) * rate / 100;
+  return principal * dailyRate;
 }

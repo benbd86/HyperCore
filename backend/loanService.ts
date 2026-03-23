@@ -1,5 +1,5 @@
 import { AppDataSource } from "./db.js";
-import { Loan } from "./entities/Loan.js";
+import { Loan, WorkDaysPaymentType } from "./entities/Loan.js";
 import { Payment } from "./entities/Payment.js";
 import { createLoanSchedule } from "./bulletLoan.js";
 import { getCurrentPrimeRateAsDecimal } from "./primeRateService.js";
@@ -9,6 +9,7 @@ export interface CreateLoanInput {
   principalAmount: number;
   startDate: string;
   endDate: string;
+  workDaysPayments: WorkDaysPaymentType;
 }
 
 const ERROR_START_AFTER_END = "Start date must be before or equal to end date.";
@@ -26,7 +27,8 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
   const schedule = await createLoanSchedule(
     input.principalAmount,
     input.startDate,
-    input.endDate
+    input.endDate,
+    input.workDaysPayments,
   );
 
   const repo = AppDataSource.getRepository(Loan);
@@ -38,6 +40,7 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
     startDate: input.startDate,
     endDate: input.endDate,
     annualRate: String(annualRate),
+    workDaysPayments: input.workDaysPayments,
   });
   await repo.save(loan);
 

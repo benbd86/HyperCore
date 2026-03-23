@@ -11,6 +11,7 @@ export const LOANS_PAGE = gql`
         startDate
         endDate
         totalExpectedInterest
+        workDaysPayments
       }
       totalCount
       hasMore
@@ -57,6 +58,7 @@ export const CREATE_LOAN = gql`
       startDate
       endDate
       totalExpectedInterest
+      workDaysPayments
     }
   }
 `;

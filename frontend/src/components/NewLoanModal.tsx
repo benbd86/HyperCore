@@ -28,6 +28,7 @@ export function NewLoanModal({ onClose, onCreated }: NewLoanModalProps) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [dateError, setDateError] = useState<string | null>(null);
+  const [workDaysPayments, setWorkDaysPayments] = useState(0);
   const [createLoan, { loading, error }] = useMutation(CREATE_LOAN, {
     onCompleted: onCreated,
     onError: () => {},
@@ -51,6 +52,7 @@ export function NewLoanModal({ onClose, onCreated }: NewLoanModalProps) {
           principalAmount: principal,
           startDate,
           endDate,
+          workDaysPayments,
         },
       },
     });
@@ -109,6 +111,19 @@ export function NewLoanModal({ onClose, onCreated }: NewLoanModalProps) {
               }}
               required
             />
+          </FormGroup>
+          <FormGroup>
+            <Label htmlFor="work-days-payments">Work days payments</Label>
+            <select 
+              id="work-days-payments"
+              value={workDaysPayments}
+              onChange={(e) => setWorkDaysPayments(Number(e.target.value))}
+              required
+            >
+              <option value={0}>Allowed</option>
+              <option value={1}>Next day</option>
+              <option value={2}>Previous day</option>
+            </select>
           </FormGroup>
           {dateError && (
             <ErrorMessage>{dateError}</ErrorMessage>
